@@ -52,19 +52,19 @@ All three components resolve the same fixed path with no plugin-env dependency; 
 All user configuration lives in the plugin's `userConfig` (declared in `plugin.json`); there is no hand-rolled config file.
 Each component reads it by its own idiomatic channel:
 
-| setting           | type                                | read by hook    | read by drill                           |
-| ----------------- | ----------------------------------- | --------------- | --------------------------------------- |
-| `native_language` | string, no default                  | env             | inline `${user_config.native_language}` |
-| `rephrase`        | boolean, default true               | env             | not needed                              |
-| `show_feedback`   | boolean, default true               | env             | not needed                              |
-| `llm_base_url`    | string                              | env             | not needed                              |
-| `llm_model`       | string, default openai/gpt-oss-120b | env             | not needed                              |
-| `llm_api_key`     | string, sensitive                   | env (to verify) | not needed                              |
+| setting           | type                                | read by hook   | read by drill                           |
+| ----------------- | ----------------------------------- | -------------- | --------------------------------------- |
+| `native_language` | string, no default                  | env            | inline `${user_config.native_language}` |
+| `rephrase`        | boolean, default true               | env            | not needed                              |
+| `show_feedback`   | boolean, default true               | env            | not needed                              |
+| `llm_base_url`    | string                              | env            | not needed                              |
+| `llm_model`       | string, default openai/gpt-oss-120b | env            | not needed                              |
+| `llm_api_key`     | string, sensitive                   | env (verified) | not needed                              |
 
 - The **hook** reads `CLAUDE_PLUGIN_OPTION_<KEY>` environment variables (documented for hook processes).
 - The **drill** reads `${user_config.KEY}` inline substitution in `SKILL.md`; Claude sees the values in context and writes the native-language contrast itself, so no value is passed to a subprocess. `${CLAUDE_PLUGIN_ROOT}` substitutes the same way to locate bundled scripts and assets.
 - The **statusline** reads no config; it only reads the fixed `status/<session-id>` path.
-- Build-time check: confirm `sensitive` userConfig values actually reach the hook env. If they do not, the LLM credentials (only) fall back to a private file the hook reads; everything else stays in userConfig.
+- **Verified empirically** (throwaway probe plugin, 2026-07-22): `sensitive` userConfig values _are_ injected into the hook env as `CLAUDE_PLUGIN_OPTION_<KEY>`, even though they are stored outside `settings.json` (which holds non-sensitive options only). Credentials therefore live in userConfig like everything else; no private-file fallback is needed. `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PLUGIN_DATA` are also set for hook processes.
 
 ### Toggles
 
