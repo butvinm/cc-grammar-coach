@@ -228,9 +228,9 @@ No language placeholder in v1 (the prompt never named a specific native language
 
 - Create: `README.md`
 
-- [ ] Write install (`/plugin marketplace add`, `/plugin install`, the userConfig prompts), the manual statusline wiring step, config reference, usage, and the v1-is-English-only statement.
-- [ ] Confirm the exact slash form Claude Code exposes for the bundled skill before documenting it.
-- [ ] Verify: perform a real clean install by following the README verbatim against an empty `GRAMMAR_HOME`, and confirm feedback appears - not a read-through.
+- [x] Write install (`/plugin marketplace add`, `/plugin install`, the userConfig prompts), the manual statusline wiring step, config reference, usage, and the v1-is-English-only statement. (README.md at repo root; all six userConfig fields named from D3/plugin.json; manual statusline step documents both the source-render_grammar snippet and grammar-statusline.sh; config + GRAMMAR_HOME tables; v1-English-only stated up front)
+- [x] Confirm the exact slash form Claude Code exposes for the bundled skill before documenting it. (documented `/cc-grammar-coach:grammar-drill` = `/plugin-name:skill-name`; evidence: installed humanizer plugin README shows `/humanizer:humanizer` for the same plugin:skill pattern, and the Skill-tool contract states plugin skills use `plugin:skill`; live confirmation left for Task 8)
+- [x] Verify: perform a real clean install by following the README verbatim against an empty `GRAMMAR_HOME`, and confirm feedback appears - not a read-through. (MECHANICAL clean-install path verified against a fresh empty GRAMMAR_HOME: shipped hooks/grammar-check.sh with GRAMMAR_HOOK_SYNC=1 + the README's CLAUDE_PLUGIN_OPTION_* config + creds from ~/.claude/grammar-llm.env produced a status file with 3 fix lines + a ✨ rephrase and one history.jsonl line; both README statusline snippets then rendered that status file correctly, exit 0. The interactive `/plugin marketplace add` + `/plugin install` step cannot run in this subagent and is left for the Task 8 live session.)
 
 ### Task 8: Verify acceptance criteria
 
