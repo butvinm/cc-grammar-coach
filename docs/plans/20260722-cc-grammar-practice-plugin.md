@@ -203,11 +203,11 @@ No language placeholder in v1 (the prompt never named a specific native language
 
 - Create: `skills/grammar-drill/SKILL.md`, `skills/grammar-drill/scripts/build_drill.py`, `skills/grammar-drill/assets/drill-template.html`, `skills/grammar-drill/assets/duo.css`, `skills/grammar-drill/references/syllabus.md`
 
-- [ ] Port `SKILL.md`: read `history.jsonl` as JSONL (no legacy grep), rank recent categories, both modes; `${user_config.native_language}` inline; locate the builder via `${CLAUDE_PLUGIN_ROOT}`; portable page opener (`open`/`xdg-open` detection).
-- [ ] Port `build_drill.py` near-verbatim: validate the drill JSON (schema embedded in the script - no separate file), fill the template, inline CSS, `mkdir -p` and write to `$GRAMMAR_HOME/drills/`, print the path, never open.
-- [ ] Port `drill-template.html`, `duo.css`, `references/syllabus.md`.
-- [ ] Verify: hand-write a minimal drill JSON, run `build_drill.py`, assert a self-contained HTML file at the printed path that renders and grades offline.
-- [ ] Verify (ranking is falsifiable): feed a synthetic `history.jsonl` with 5 `articles`, 3 `tense`, 1 `plural` fix lines and assert the skill's ranking rules select `articles` then `tense`.
+- [x] Port `SKILL.md`: read `history.jsonl` as JSONL (no legacy grep), rank recent categories, both modes; `${user_config.native_language}` inline; locate the builder via `${CLAUDE_PLUGIN_ROOT}`; portable page opener (`open`/`xdg-open` detection). (legacy grep/awk/tail/stats.tsv dropped; ranking is a concrete embedded python heredoc; opener detect-and-degrade to printing the path; curriculum at `$GRAMMAR_HOME/curriculum.tsv`)
+- [x] Port `build_drill.py` near-verbatim: validate the drill JSON (schema embedded in the script - no separate file), fill the template, inline CSS, `mkdir -p` and write to `$GRAMMAR_HOME/drills/`, print the path, never open. (only change vs source: output dir now `$GRAMMAR_HOME/drills/`, GRAMMAR_HOME default `~/.claude/cc-grammar-coach`; embedded `validate()` unchanged)
+- [x] Port `drill-template.html`, `duo.css`, `references/syllabus.md`. (byte-identical copies; `assets/duo.md` omitted - referenced by neither SKILL.md nor the template)
+- [x] Verify: hand-write a minimal drill JSON, run `build_drill.py`, assert a self-contained HTML file at the printed path that renders and grades offline. (path exists under `$GRAMMAR_HOME/drills/`; no external `<link>`; `.duo-shell` CSS inlined and `__DUO_CSS__` replaced; `const DATA =` + `function check()` grading JS present, `__DRILL_DATA__` replaced)
+- [x] Verify (ranking is falsifiable): feed a synthetic `history.jsonl` with 5 `articles`, 3 `tense`, 1 `plural` fix lines and assert the skill's ranking rules select `articles` then `tense`. (ran SKILL.md ranking heredoc verbatim: 5 articles / 3 tense / 1 plural -> 1st=articles, 2nd=tense; reversed-data control gives tense first, so the assertion can fail)
 
 ### Task 6: Eval harness and clean public dataset
 
