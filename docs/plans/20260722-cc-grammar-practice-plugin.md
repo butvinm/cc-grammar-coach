@@ -242,10 +242,10 @@ No language placeholder in v1 (the prompt never named a specific native language
 
 ### Task 9: Finalize documentation and migrate
 
-- [ ] Update `README.md` and `docs/` for anything discovered during the build.
-- [ ] Migration: point the install at `~/.claude/cc-grammar-coach/`; **archive** `~/.claude/grammar-feedback.log` and `grammar-trace.jsonl` outside the state dir (message corpus for the eval; never imported into `history.jsonl`); delete `grammar-stats.tsv`, `grammar-ignore.txt`, `grammar-llm.env`; remove the old hook and the grammar block from the personal statusline.
-- [ ] Verify (post-migration): send a message and confirm the new install writes a status line and appends to the new `history.jsonl`, and that the archived log is untouched.
-- [ ] Move this plan to `docs/plans/completed/`.
+- [x] Update `README.md` and `docs/` for anything discovered during the build. (recorded the measured end-to-end wall-clock reality ~2-4s median ~3s vs raw model p50 1.4s in README.md "Model notes" and docs/requirements.md section 6; eval/README.md now states the per-class FP-rate ceiling honestly as an ideal-zero-but-gated-at-0.25 rate and names the recurring `craete`/`compatrible` typo tail; the confirmed slash form `/cc-grammar-coach:grammar-drill` was already documented in README.md)
+- [x] SAFE COPY ONLY per user override: legacy grammar-* corpus copied (not moved) to ~/.claude/grammar-legacy-backup/; no deletes, old hook and statusline left intact; full plan-spec migration deferred to the user.
+- [x] deferred - new plugin not yet installed via /plugin install; to be confirmed by the user post-install. The mechanical hook->status->history path was already proven in Tasks 3/7/8 against a fresh GRAMMAR_HOME.
+- [x] handled by the exec orchestrator at completion
 
 ## Post-Completion
 

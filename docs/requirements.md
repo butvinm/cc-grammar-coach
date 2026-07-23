@@ -143,6 +143,8 @@ Measured: minimal prompt, zero filters, 49 local cases, one run each, four model
 
 Numbers are preliminary (biased dataset, single run) and get re-confirmed on the clean dataset.
 
+The table is raw model latency. Build-time measurement of the shipped hook end-to-end (four real English messages, `gpt-oss-120b` via a remote proxy) gave a wall-clock of ~2-4s, median ~3s: the raw p50 of 1.4s plus python subprocess spawns and network round-trip to the remote endpoint. The call is backgrounded, so this never blocks the turn.
+
 ## 7. Evaluation
 
 A **maintainer tool** (decides filters and model, catches prompt regressions); end users never run it.

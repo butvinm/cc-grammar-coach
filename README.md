@@ -132,7 +132,7 @@ The skill has two modes. **Drill** (default) ranks your recent weak spots from `
 
 ## Model notes
 
-The default model is **`openai/gpt-oss-120b`**, chosen by measurement: it was silent on every typo and name/mention case, had the best recall, and returned in ~1.4s at the median. See `eval/` for the harness and dataset behind that choice.
+The default model is **`openai/gpt-oss-120b`**, chosen by measurement: it was silent on every typo and name/mention case, had the best recall, and returned in ~1.4s at the median. That ~1.4s is the model's raw p50; the shipped hook's end-to-end wall-clock (python subprocess spawns plus the round-trip to a remote endpoint) measured roughly **2-4s, median ~3s**, so feedback lands a few seconds after you send a message, not instantly. Because the call is backgrounded, none of that latency ever blocks your turn. See `eval/` for the harness and dataset behind the model choice.
 
 With **no API key configured**, the hook needs zero setup and falls back to `claude -p` with haiku. That path is slower and less strict about output format, but works offline of any custom endpoint. A **custom OpenAI-compatible endpoint** is opt-in: set the base URL, model, and key, and vet it with `eval/run.py` before trusting it.
 
