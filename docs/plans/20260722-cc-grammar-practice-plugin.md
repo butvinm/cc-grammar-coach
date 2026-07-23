@@ -151,12 +151,12 @@ No language placeholder in v1 (the prompt never named a specific native language
 
 - Create: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `hooks/hooks.json`, `.gitignore`, `LICENSE`
 
-- [ ] `git init` on `master`; `.gitignore` (local test homes, `*.bak-*`, `drills/`); add `LICENSE` matching the manifest's declared license.
-- [ ] `plugin.json`: name `cc-grammar-coach`, version, description, **author** (the validator warns without it), repository, license, keywords, and the full `userConfig` block (D3) with `type`/`title`/`description`/`default` on every field.
-- [ ] `hooks/hooks.json`: one `UserPromptSubmit` entry running `"${CLAUDE_PLUGIN_ROOT}"/hooks/grammar-check.sh` (quoted - the root may contain spaces), timeout 10s. Rely on convention discovery; do **not** also add a `hooks` field to `plugin.json`.
-- [ ] `marketplace.json`: list this one plugin from this repo.
-- [ ] Declare `llm_api_key` as `sensitive`. **Already verified** (throwaway probe plugin, 2026-07-22): sensitive values are injected into the hook env as `CLAUDE_PLUGIN_OPTION_<KEY>` while being stored outside `settings.json`, so credentials live in userConfig with no private-file fallback. No spike needed.
-- [ ] Verify: `claude plugin validate` passes (catches bad event names, hook shape, and userConfig schema - `json.load` cannot).
+- [x] `git init` on `master`; `.gitignore` (local test homes, `*.bak-*`, `drills/`); add `LICENSE` matching the manifest's declared license. (repo already exists on branch `cc-grammar-practice-plugin`; `git init` treated as satisfied per executor note)
+- [x] `plugin.json`: name `cc-grammar-coach`, version, description, **author** (the validator warns without it), repository, license, keywords, and the full `userConfig` block (D3) with `type`/`title`/`description`/`default` on every field.
+- [x] `hooks/hooks.json`: one `UserPromptSubmit` entry running `"${CLAUDE_PLUGIN_ROOT}"/hooks/grammar-check.sh` (quoted - the root may contain spaces), timeout 10s. Rely on convention discovery; do **not** also add a `hooks` field to `plugin.json`.
+- [x] `marketplace.json`: list this one plugin from this repo.
+- [x] Declare `llm_api_key` as `sensitive`. **Already verified** (throwaway probe plugin, 2026-07-22): sensitive values are injected into the hook env as `CLAUDE_PLUGIN_OPTION_<KEY>` while being stored outside `settings.json`, so credentials live in userConfig with no private-file fallback. No spike needed.
+- [x] Verify: `claude plugin validate` passes (catches bad event names, hook shape, and userConfig schema - `json.load` cannot). (passed `--strict` for both plugin.json and marketplace.json)
 
 ### Task 2: Checker prompt and category list
 

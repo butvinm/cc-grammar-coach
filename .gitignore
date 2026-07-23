@@ -1,0 +1,16 @@
+# Local test grammar homes
+test-home/
+*-home/
+.grammar-home/
+
+# Backups
+*.bak-*
+
+# Generated drill pages
+drills/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

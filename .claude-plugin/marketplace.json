@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace-manifest.json",
+  "name": "cc-grammar-coach",
+  "owner": {
+    "name": "Mikhail Butvin",
+    "url": "https://github.com/butvinm"
+  },
+  "description": "The cc-grammar-coach plugin: an out-of-band English grammar checker and a mistake-driven drill skill, installable as a Claude Code plugin.",
+  "plugins": [
+    {
+      "name": "cc-grammar-coach",
+      "source": "./",
+      "description": "Out-of-band English grammar checker (UserPromptSubmit hook) that logs your mistakes and shows optional statusline feedback, plus a drill skill that turns the log into a lesson-and-quiz web page.",
+      "license": "MIT",
+      "keywords": ["grammar", "english", "language-learning", "writing", "hook", "statusline", "education"]
+    }
+  ]
+}
