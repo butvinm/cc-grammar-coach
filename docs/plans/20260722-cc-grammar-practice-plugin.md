@@ -193,9 +193,9 @@ No language placeholder in v1 (the prompt never named a specific native language
 
 - Create: `statusline/render-grammar.sh`, `statusline/grammar-statusline.sh`
 
-- [ ] `render-grammar.sh`: `render_grammar()` reads `$GRAMMAR_HOME/status/$SID`, colors `✔`/`✨` green and splits `[category]` fix lines on `" → "` into colored parts, soft-wrapping to width. Extract and parameterize from `~/.claude/statusline.sh:63-145`.
-- [ ] `grammar-statusline.sh`: minimal standalone statusline sourcing the function (session id from stdin JSON via python3).
-- [ ] Verify: seed a status file with one `✔` line, one `[articles] a → an (rule: ...)` line, and one `✨` line; run the wrapper with a matching payload; assert all three render, the fix line splits into parts (not the fallback branch), and no `[category]` tag leaks into the output.
+- [x] `render-grammar.sh`: `render_grammar()` reads `$GRAMMAR_HOME/status/$SID`, colors `✔`/`✨` green and splits `[category]` fix lines on `" → "` into colored parts, soft-wrapping to width. Extract and parameterize from `~/.claude/statusline.sh:63-145`. (SID from arg or $SID var; GRAMMAR_HOME default `~/.claude/cc-grammar-coach`, overridable; render_fix_line lifted verbatim)
+- [x] `grammar-statusline.sh`: minimal standalone statusline sourcing the function (session id from stdin JSON via python3). (python3 parse with default fallback; sources sibling render-grammar.sh via BASH_SOURCE dir)
+- [x] Verify: seed a status file with one `✔` line, one `[articles] a → an (rule: ...)` line, and one `✨` line; run the wrapper with a matching payload; assert all three render, the fix line splits into parts (not the fallback branch), and no `[category]` tag leaks into the output. (all 3 render; wrong "a" red + fix "an" green via SPLIT branch; no yellow fallback; no `[articles]` tag in stripped output; `bash -n` clean on both)
 
 ### Task 5: Drill skill adapted to the JSONL log
 
