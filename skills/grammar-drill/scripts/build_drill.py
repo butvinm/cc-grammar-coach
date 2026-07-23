@@ -35,6 +35,10 @@ def validate(data: dict) -> None:
         for key in ("id", "label", "count", "lesson"):
             if key not in t:
                 fail(f"topic missing '{key}': {t}")
+        if not isinstance(t["count"], int) or t["count"] < 0:
+            fail(f"topic '{t['id']}' 'count' must be a non-negative integer")
+        if not isinstance(t["lesson"], dict):
+            fail(f"topic '{t['id']}' 'lesson' must be an object")
         if not t["lesson"].get("summary") or not t["lesson"].get("examples"):
             fail(f"topic '{t['id']}' lesson needs 'summary' and 'examples'")
         for e in t["lesson"]["examples"]:
@@ -66,17 +70,17 @@ def main() -> None:
         fail("usage: build_drill.py <data.json> [output.html]")
     data_path = Path(sys.argv[1])
     try:
-        data = json.loads(data_path.read_text())
+        data = json.loads(data_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot read drill data: {exc}")
     data.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
     validate(data)
 
     assets = Path(__file__).parent.parent / "assets"
-    template = (assets / "drill-template.html").read_text()
+    template = (assets / "drill-template.html").read_text(encoding="utf-8")
     # duo.css is inlined rather than linked: the page is written to a different
     # directory than the assets and has to stand alone.
-    page = template.replace(CSS_PLACEHOLDER, (assets / "duo.css").read_text())
+    page = template.replace(CSS_PLACEHOLDER, (assets / "duo.css").read_text(encoding="utf-8"))
     # Escaping '</' keeps any '</script>' inside drill strings from ending the script tag.
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     page = page.replace(PLACEHOLDER, payload)
@@ -88,7 +92,7 @@ def main() -> None:
         out_dir = home / "drills"
         out_dir.mkdir(parents=True, exist_ok=True)
         out = out_dir / f"drill-{data['date']}-{datetime.now().strftime('%H%M')}.html"
-    out.write_text(page)
+    out.write_text(page, encoding="utf-8")
     print(out)
 
 

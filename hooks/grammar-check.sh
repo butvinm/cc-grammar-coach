@@ -26,11 +26,18 @@ LLM_BASE_URL="${CLAUDE_PLUGIN_OPTION_LLM_BASE_URL:-}"
 LLM_MODEL="${CLAUDE_PLUGIN_OPTION_LLM_MODEL:-openai/gpt-oss-120b}"
 LLM_API_KEY="${CLAUDE_PLUGIN_OPTION_LLM_API_KEY:-}"
 
-# --- parse stdin ---
+# --- parse stdin (one python pass: session_id on line 1, then the raw prompt) ---
 INPUT=$(cat)
-SID=$(printf '%s' "$INPUT" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("session_id") or "default")' 2>/dev/null)
-[ -z "$SID" ] && SID=default
-PROMPT=$(printf '%s' "$INPUT" | python3 -c 'import sys,json;sys.stdout.write(json.load(sys.stdin).get("prompt") or "")' 2>/dev/null)
+{
+  IFS= read -r SID
+  PROMPT=$(cat)
+} < <(printf '%s' "$INPUT" | python3 -c 'import sys, json
+d = json.load(sys.stdin)
+sys.stdout.write((d.get("session_id") or "default") + "\n" + (d.get("prompt") or ""))' 2>/dev/null)
+# Harden the session id before it becomes a path component: a value carrying a
+# slash or ".." could escape status/. Real ids are Claude Code UUIDs; anything
+# else falls back to "default".
+case "$SID" in ''|*/*|*..*) SID=default ;; esac
 
 STATUS_FILE="$STATUS_DIR/$SID"
 : > "$STATUS_FILE"
@@ -79,7 +86,7 @@ sys.stdout.write("\n".join(out).replace("{{CATEGORIES}}", ", ".join(cats)))
 ')
 
   FEEDBACK=""
-  if [ -n "$LLM_API_KEY" ] && [ -n "$LLM_BASE_URL" ] && [ -n "$LLM_MODEL" ]; then
+  if [ -n "$LLM_API_KEY" ] && [ -n "$LLM_BASE_URL" ]; then
     PAYLOAD=$(MODEL="$LLM_MODEL" SYS="$PROMPT_SYS" USR="$PROMPT" python3 -c '
 import os, json
 print(json.dumps({
@@ -91,8 +98,14 @@ print(json.dumps({
     ],
 }))
 ')
+    # The Authorization header carries the key via a curl config read from stdin
+    # (the shell writes the here-doc straight to curl), so the secret never lands
+    # in any process argv where `ps` could read it.
     RESP=$(curl -s --max-time 60 "$LLM_BASE_URL/chat/completions" \
-      -H "Authorization: Bearer $LLM_API_KEY" -H "Content-Type: application/json" -d "$PAYLOAD")
+      -H "Content-Type: application/json" -d "$PAYLOAD" --config - <<EOF
+header = "Authorization: Bearer $LLM_API_KEY"
+EOF
+)
     FEEDBACK=$(printf '%s' "$RESP" | python3 -c '
 import sys, json
 try:

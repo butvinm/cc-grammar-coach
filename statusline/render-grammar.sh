@@ -20,10 +20,10 @@ RED='\033[31m'
 DIM='\033[2m'
 RESET='\033[0m'
 
-# Renders one fix line with a colour per part - red for the wrong fragment, green for the correction, gray for the reason, dim for the ×N counter - so the three can be told apart at a glance instead of reading as one long sentence.
+# Renders one fix line with a colour per part - red for the wrong fragment, green for the correction, gray for the reason, dim for the arrow - so the three can be told apart at a glance instead of reading as one long sentence.
 # Wrapping happens here too: only the visible text is measured, and the active colour is re-emitted at the start of each wrapped segment, so escape bytes never corrupt the width calculation.
 render_fix_line() {
-    awk -v W="$WIDTH" -v WRONG="$1" -v RIGHT="$2" -v WHY="$3" -v TAIL="$4" \
+    awk -v W="$WIDTH" -v WRONG="$1" -v RIGHT="$2" -v WHY="$3" \
         -v CR="$RED" -v CG="$GREEN" -v CGY="$GRAY" -v CD="$DIM" -v CX="$RESET" '
     function add(txt, col,   k, a, m) {
         if (txt == "") return
@@ -32,7 +32,7 @@ render_fix_line() {
     }
     BEGIN {
         n = 0
-        add(WRONG, CR); add("→", CD); add(RIGHT, CG); add(WHY, CGY); add(TAIL, CD)
+        add(WRONG, CR); add("→", CD); add(RIGHT, CG); add(WHY, CGY)
         out = ""; len = 0; cur = ""
         for (i = 1; i <= n; i++) {
             if (len > 0 && len + 1 + length(word[i]) > W) {
@@ -49,6 +49,8 @@ render_fix_line() {
 
 render_grammar() {
     local sid="${1:-$SID}"
+    # Defensive: a session id carrying a slash or ".." could read outside status/.
+    case "$sid" in ''|*/*|*..*) sid=default ;; esac
     local home="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
     local GRAMMAR_FILE="$home/status/$sid"
 
@@ -60,24 +62,22 @@ render_grammar() {
     # Reserve 4 columns consumed by Claude Code's statusline padding.
     WIDTH=$((WIDTH - 4))
 
-    local line LINE_COLOR body fx_wrong fx_rest fx_tail fx_why fx_right
+    local line LINE_COLOR body fx_wrong fx_rest fx_why fx_right
     while IFS= read -r line || [[ -n "$line" ]]; do
         case "$line" in
             '✔'*)      LINE_COLOR=$GREEN ;;
             '✨'*)      LINE_COLOR=$GREEN ;;
             '['*'] '*)
-                # Split "wrong → right (why) — category ×N" into its parts and render each in its own colour.
+                # Split "wrong → right (why)" into its parts and render each in its own colour.
                 # A tagged line that does not carry the arrow is not a fix line we understand, so it falls through to the flat yellow rendering below.
                 body="${line#*] }"
                 if [[ "$body" == *" → "* ]]; then
                     fx_wrong="${body%% → *}"
                     fx_rest="${body#* → }"
-                    fx_tail=""
-                    [[ "$fx_rest" == *" — "* ]] && { fx_tail="— ${fx_rest##* — }"; fx_rest="${fx_rest% — *}"; }
                     fx_why=""
                     [[ "$fx_rest" == *"("* ]] && { fx_why="(${fx_rest##*(}"; fx_rest="${fx_rest%(*}"; }
                     fx_right="${fx_rest%"${fx_rest##*[![:space:]]}"}"
-                    render_fix_line "$fx_wrong" "$fx_right" "$fx_why" "$fx_tail" \
+                    render_fix_line "$fx_wrong" "$fx_right" "$fx_why" \
                         | while IFS= read -r seg || [[ -n "$seg" ]]; do
                             printf "\n%s" "$seg"
                         done

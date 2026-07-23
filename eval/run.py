@@ -13,8 +13,14 @@ Scoring is per class and never pooled:
   - recall (per grammar category) whether a known error is flagged, and whether
                         it is flagged with the expected category
 
-Exit code is non-zero when any gate fails (silence classes must be perfect;
-recall must clear a configurable floor), so CI and the plan's Task 8 can gate.
+Exit code is non-zero when any gate fails (silence classes must stay under a
+false-positive-rate ceiling; recall must clear a flagged-any floor and a pooled
+exact-category floor), so CI and the plan's Task 8 can gate.
+
+The model is nondeterministic, so a single sample of each case is noisy: the
+exit code of one --repeats 1 run is not by itself authoritative. Reproduce a
+result before trusting it, or raise --repeats so the gate reads a mean over N
+independent samples per case (each in its own isolated GRAMMAR_HOME).
 
 No jq. Deps: python3, plus whatever the hook itself needs (bash, curl).
 
@@ -26,8 +32,9 @@ grammar-llm.env). Nothing is hardcoded. With no key set the hook falls back to
 `claude -p` haiku, which the harness also tolerates.
 
 Usage:
-    python3 eval/run.py            # run the real dataset against the shipped hook
-    python3 eval/run.py --selftest # prove the non-zero gate path, no network
+    python3 eval/run.py             # run the real dataset against the shipped hook
+    python3 eval/run.py --repeats 3 # sample each case 3x and gate on the mean
+    python3 eval/run.py --selftest  # prove the non-zero gate path, no network
 """
 
 import json
@@ -38,7 +45,8 @@ import sys
 import tempfile
 
 # --- protocol markers (R3): must be byte-identical to the prompt, the hook,
-# and the statusline. run.py parses the status file on these exact bytes. ---
+# and the statusline. Anchored here so Task 8's cross-file byte-identity grep
+# has a copy in this file even though scoring now reads history.jsonl. ---
 ARROW = "→"    # -> separates wrong from fix
 CHECK = "✔"    # praise / liveness
 SPARKLE = "✨"  # rephrase
@@ -58,6 +66,15 @@ MIN_RECALL = float(os.environ.get("GRAMMAR_EVAL_MIN_RECALL", "0.7"))
 # model - the rejected gemini failed ~55% of typo-silence. Every FP is still
 # listed in the report for the maintainer to inspect.
 MAX_SILENT_FP_RATE = float(os.environ.get("GRAMMAR_EVAL_MAX_SILENT_FP_RATE", "0.25"))
+# Exact-category recall floor: the fraction of recall samples flagged with their
+# OWN category slug, pooled across all categories. This is the gate against a
+# model that catches every error but files them all under one wrong slug (which
+# would still score 100% on the flagged-any floor below). It is pooled, not
+# per-category, because category naming is stochastic - a single category can
+# score zero exact hits on one sample by chance (tense <-> verb-form overlap),
+# so a strict per-category zero-fail would be flaky. Pooling separates a healthy
+# model (~0.9 exact) from mislabel-everything (~0.17) with wide margin.
+MIN_EXACT_RECALL = float(os.environ.get("GRAMMAR_EVAL_MIN_EXACT_RECALL", "0.5"))
 
 
 def forward_creds(env):
@@ -91,11 +108,12 @@ def load_cases(path):
 
 
 def run_hook(message, case_id):
-    """Invoke the shipped hook for one message in a fresh GRAMMAR_HOME.
+    """Invoke the shipped hook once for one message in a fresh GRAMMAR_HOME.
 
-    Returns (fixes, categories, status_text). fixes is the parsed fixes[] list
-    from the isolated history.jsonl (authoritative); categories is the set of
-    category slugs seen; status_text is the raw status file contents.
+    Returns (flagged, categories). flagged is whether the isolated history.jsonl
+    recorded any fix (the authoritative signal - the status file is a display
+    subset of the same match, so it adds nothing); categories is the set of
+    category slugs seen.
     """
     home = tempfile.mkdtemp(prefix="grammar-eval-")
     try:
@@ -116,12 +134,6 @@ def run_hook(message, case_id):
             timeout=PER_CASE_TIMEOUT,
         )
 
-        status_path = os.path.join(home, "status", case_id)
-        status_text = ""
-        if os.path.exists(status_path):
-            with open(status_path, encoding="utf-8") as fh:
-                status_text = fh.read()
-
         fixes = []
         history_path = os.path.join(home, "history.jsonl")
         if os.path.exists(history_path):
@@ -135,20 +147,21 @@ def run_hook(message, case_id):
                     except json.JSONDecodeError:
                         pass
 
-        # Cross-check against the status file on the exact ARROW byte, in case a
-        # fix line reached the statusline but not history.
-        status_flagged = any(ARROW in ln and ln.lstrip().startswith("[") for ln in status_text.splitlines())
-
         categories = {f.get("category", "") for f in fixes}
-        flagged = bool(fixes) or status_flagged
-        return flagged, categories, status_text
+        return bool(fixes), categories
     finally:
         shutil.rmtree(home, ignore_errors=True)
 
 
 def evaluate(results):
-    """Aggregate per-class stats and decide pass/fail. results is a list of
-    dicts: {case, flagged, categories}. Returns (report_lines, ok)."""
+    """Aggregate per-class stats over N repeats per case and decide pass/fail.
+
+    results is a list of per-case dicts: {case, runs, flag_count, exact_count}
+    where flag_count is how many of the `runs` samples flagged, and exact_count
+    is how many flagged with the case's own category (recall cases only).
+    Rates are means over samples (sum of flags / sum of runs), so they absorb
+    single-sample noise as `runs` grows. Returns (report_lines, ok).
+    """
     typo = [r for r in results if r["case"]["class"] == "typo-silent"]
     name = [r for r in results if r["case"]["class"] == "name-silent"]
     recall = [r for r in results if r["case"]["class"] == "recall"]
@@ -156,49 +169,65 @@ def evaluate(results):
     lines = []
     ok = True
 
-    def silence_block(title, group, gate_key):
+    def silence_block(title, group):
         nonlocal ok
-        fp = [r for r in group if r["flagged"]]
-        silent = len(group) - len(fp)
-        rate = len(fp) / len(group) if group else 0.0
-        lines.append("  %-22s silent %d/%d  (false positives: %d, %.0f%%, ceiling %.0f%%)"
-                     % (title, silent, len(group), len(fp), rate * 100, MAX_SILENT_FP_RATE * 100))
-        for r in fp:
-            lines.append("      FP  %-8s %s" % (r["case"]["id"], r["case"]["message"]))
+        samples = sum(r["runs"] for r in group)
+        fp_samples = sum(r["flag_count"] for r in group)
+        rate = fp_samples / samples if samples else 0.0
+        lines.append("  %-22s FP %d/%d samples  (%.0f%%, ceiling %.0f%%)"
+                     % (title, fp_samples, samples, rate * 100, MAX_SILENT_FP_RATE * 100))
+        for r in group:
+            if r["flag_count"]:
+                lines.append("      FP  %-8s [%d/%d runs] %s"
+                             % (r["case"]["id"], r["flag_count"], r["runs"], r["case"]["message"]))
         if rate > MAX_SILENT_FP_RATE:
             ok = False
             lines.append("      -> FAIL: %s false-positive rate %.0f%% exceeds ceiling %.0f%%"
-                         % (gate_key, rate * 100, MAX_SILENT_FP_RATE * 100))
+                         % (title, rate * 100, MAX_SILENT_FP_RATE * 100))
 
     lines.append("TYPO-SILENT (a misspelling must not be flagged)")
-    silence_block("typo-silent", typo, "typo-silent")
+    silence_block("typo-silent", typo)
     lines.append("")
     lines.append("NAME/MENTION-SILENT (identifiers, paths, quoted mentions stay silent)")
-    silence_block("name/mention-silent", name, "name/mention-silent")
+    silence_block("name/mention-silent", name)
     lines.append("")
 
-    lines.append("RECALL (a known grammar error must be flagged)")
+    lines.append("RECALL (a known grammar error must be flagged, with its category)")
     by_cat = {}
     for r in recall:
         by_cat.setdefault(r["case"]["category"], []).append(r)
     total_flagged = 0
+    total_exact = 0
+    total_samples = 0
     for cat in sorted(by_cat):
         group = by_cat[cat]
-        flagged = [r for r in group if r["flagged"]]
-        exact = [r for r in group if cat in r["categories"]]
-        total_flagged += len(flagged)
+        samples = sum(r["runs"] for r in group)
+        flagged = sum(r["flag_count"] for r in group)
+        exact = sum(r["exact_count"] for r in group)
+        total_flagged += flagged
+        total_exact += exact
+        total_samples += samples
         lines.append("  %-14s caught %d/%d (exact category)   flagged %d/%d (any)"
-                     % (cat, len(exact), len(group), len(flagged), len(group)))
+                     % (cat, exact, samples, flagged, samples))
         for r in group:
-            if not r["flagged"]:
+            if r["flag_count"] == 0:
                 lines.append("      MISS %-8s %s" % (r["case"]["id"], r["case"]["message"]))
-    rate = total_flagged / len(recall) if recall else 1.0
-    lines.append("  %-14s flagged %d/%d  (%.0f%%, floor %.0f%%)"
-                 % ("OVERALL", total_flagged, len(recall), rate * 100, MIN_RECALL * 100))
-    if rate < MIN_RECALL:
+    flag_rate = total_flagged / total_samples if total_samples else 1.0
+    exact_rate = total_exact / total_samples if total_samples else 1.0
+    lines.append("  %-14s flagged %d/%d (%.0f%%, floor %.0f%%)   exact %d/%d (%.0f%%, floor %.0f%%)"
+                 % ("OVERALL", total_flagged, total_samples, flag_rate * 100, MIN_RECALL * 100,
+                    total_exact, total_samples, exact_rate * 100, MIN_EXACT_RECALL * 100))
+    if flag_rate < MIN_RECALL:
         ok = False
-        lines.append("      -> FAIL: recall %.0f%% below floor %.0f%%"
-                     % (rate * 100, MIN_RECALL * 100))
+        lines.append("      -> FAIL: flagged recall %.0f%% below floor %.0f%%"
+                     % (flag_rate * 100, MIN_RECALL * 100))
+    # Exact-category gate (T2): a model that files every error under one slug
+    # still clears the flagged-any floor, so pool exact-category recall and floor
+    # it. Pooled (not per-category) because single-category naming is stochastic.
+    if exact_rate < MIN_EXACT_RECALL:
+        ok = False
+        lines.append("      -> FAIL: exact-category recall %.0f%% below floor %.0f%% (errors flagged under the wrong category)"
+                     % (exact_rate * 100, MIN_EXACT_RECALL * 100))
 
     return lines, ok
 
@@ -212,11 +241,11 @@ def run_selftest():
     print("SELFTEST: running the gate on fabricated failing results (no network)\n")
     fake = [
         {"case": {"id": "st-typo", "class": "typo-silent", "message": "planted typo FP"},
-         "flagged": True, "categories": {"articles"}},
+         "runs": 1, "flag_count": 1, "exact_count": 0},
         {"case": {"id": "st-name", "class": "name-silent", "message": "clean mention"},
-         "flagged": False, "categories": set()},
+         "runs": 1, "flag_count": 0, "exact_count": 0},
         {"case": {"id": "st-recall", "class": "recall", "category": "tense", "message": "planted miss"},
-         "flagged": False, "categories": set()},
+         "runs": 1, "flag_count": 0, "exact_count": 0},
     ]
     lines, ok = evaluate(fake)
     print("\n".join(lines))
@@ -228,6 +257,19 @@ def run_selftest():
     return 1
 
 
+def parse_repeats(argv):
+    repeats = 1
+    if "--repeats" in argv:
+        i = argv.index("--repeats")
+        try:
+            repeats = int(argv[i + 1])
+        except (IndexError, ValueError):
+            sys.exit("--repeats needs a positive integer, e.g. --repeats 3")
+        if repeats < 1:
+            sys.exit("--repeats must be >= 1")
+    return repeats
+
+
 def main():
     if "--selftest" in sys.argv[1:]:
         return run_selftest()
@@ -235,17 +277,33 @@ def main():
     if not os.path.exists(HOOK):
         sys.exit("hook not found: %s" % HOOK)
 
+    repeats = parse_repeats(sys.argv[1:])
     cases = load_cases(CASES)
     have_key = bool(os.environ.get("CLAUDE_PLUGIN_OPTION_LLM_API_KEY") or os.environ.get("LLM_API_KEY"))
-    print("cc-grammar-coach eval: %d cases against %s" % (len(cases), HOOK))
-    print("model path: %s\n" % ("custom endpoint (LLM_* forwarded)" if have_key else "claude -p haiku fallback"))
+    print("cc-grammar-coach eval: %d cases x %d repeat(s) against %s" % (len(cases), repeats, HOOK))
+    print("model path: %s" % ("custom endpoint (LLM_* forwarded)" if have_key else "claude -p haiku fallback"))
+    if repeats == 1:
+        print("note: single sample per case - the model is nondeterministic; reproduce before trusting the exit code")
+    print()
 
     results = []
     for i, case in enumerate(cases, 1):
-        flagged, categories, _ = run_hook(case["message"], case["id"])
-        results.append({"case": case, "flagged": flagged, "categories": categories})
-        mark = "flag" if flagged else "silent"
-        print("  [%2d/%d] %-8s %-8s %s" % (i, len(cases), case["class"][:8], mark, case["id"]))
+        want = case.get("category")
+        flag_count = 0
+        exact_count = 0
+        seen = set()
+        for _ in range(repeats):
+            flagged, categories = run_hook(case["message"], case["id"])
+            if flagged:
+                flag_count += 1
+            if want and want in categories:
+                exact_count += 1
+            seen |= categories
+        results.append({"case": case, "runs": repeats,
+                        "flag_count": flag_count, "exact_count": exact_count})
+        mark = "flag" if flag_count else "silent"
+        suffix = "  (%d/%d flagged)" % (flag_count, repeats) if repeats > 1 else ""
+        print("  [%2d/%d] %-8s %-8s %s%s" % (i, len(cases), case["class"][:8], mark, case["id"], suffix))
 
     print()
     lines, ok = evaluate(results)

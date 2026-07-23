@@ -118,7 +118,7 @@ The checker runs on every message automatically once installed; there is nothing
 
 The three markers `→`, `✔`, and `✨` are the wire format the statusline colors and the drill parses; they are intentional and load-bearing.
 
-The checker stays quiet on things that are not clear-cut grammar errors: correct grammar, word choice and naturalness, typos, code identifiers and paths and tool names, quoted or mentioned fragments, punctuation, casing, and anything fluent speakers would fix differently. It skips very short (under 15 chars) and very long (over 500 chars) messages, slash commands, and non-English text.
+The checker is meant to stay quiet on things that are not clear-cut grammar errors: correct grammar, word choice and naturalness, typos, code identifiers and paths and tool names, quoted or mentioned fragments, punctuation, casing, and anything fluent speakers would fix differently. It skips very short (under 15 chars) and very long (over 500 chars) messages, slash commands, and non-English text. These calls are made by a model, not a rule engine, so they are not perfectly consistent run to run - it errs toward silence, and an occasional typo or borderline case slips through as a flag. Every flag still feeds the drill, so nothing is lost when it does.
 
 ### The drill
 

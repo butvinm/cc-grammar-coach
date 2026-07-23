@@ -24,7 +24,8 @@ export LLM_BASE_URL="https://your-endpoint/v1"
 export LLM_API_KEY="sk-..."
 export LLM_MODEL="openai/gpt-oss-120b"
 
-python3 eval/run.py
+python3 eval/run.py               # one sample per case (fast, noisy)
+python3 eval/run.py --repeats 3   # three samples per case, gate on the mean
 ```
 
 With no key set, the hook falls back to `claude -p` haiku and the harness tolerates it (slower, lower format compliance - see `docs/requirements.md` section 6).
@@ -39,10 +40,11 @@ python3 eval/run.py --selftest   # feeds fabricated failing results through the 
 
 `run.py` prints a per-class summary (silence rates with the offending messages listed, and per-category recall) and ends with `RESULT: PASS` or `RESULT: FAIL`. It **exits non-zero** whenever a gate fails, so CI and the plan's Task 8 can gate on it. Gates:
 
-- silence classes: the per-class false-positive **rate** must not exceed `GRAMMAR_EVAL_MAX_SILENT_FP_RATE` (default `0.25`).
-- recall: the aggregate flagged rate must be at least `GRAMMAR_EVAL_MIN_RECALL` (default `0.7`).
+- silence classes: the per-class false-positive **rate** (flagged samples / total samples) must not exceed `GRAMMAR_EVAL_MAX_SILENT_FP_RATE` (default `0.25`).
+- recall floor (flagged-any): the aggregate flagged rate must be at least `GRAMMAR_EVAL_MIN_RECALL` (default `0.7`).
+- recall floor (exact category): the pooled fraction of errors flagged under their **own** category slug must be at least `GRAMMAR_EVAL_MIN_EXACT_RECALL` (default `0.5`). A model that catches every error but files them all under one wrong category would still clear the flagged-any floor; this floor catches that. It is pooled across categories rather than gated per category because single-category naming is stochastic (`tense` and `verb-form` overlap, so one category can score zero exact hits on a single sample by chance) - pooling separates a healthy model (~0.9 exact) from mislabel-everything (~0.17) without failing on naming noise. Per-category exact counts are still printed so a genuinely weak category is visible.
 
-Both are environment-overridable for tuning. The silence gate is a rate rather than an absolute zero because the model is nondeterministic (`docs/requirements.md` section 7 measures FP "over several runs") and this harness samples each case once - repeats-per-case is a deferred open question. Consecutive live runs of `gpt-oss-120b` at build time landed the typo-silent class between 20% and 30% FP, straddling the 25% ceiling, so a single run can pass or fail on model noise alone; the ceiling still separates the accepted `gpt-oss-120b` from the rejected `gemini-3.1-flash-lite`, which leaked roughly half its typo cases. Every individual false positive is listed under its class so the maintainer can inspect debatable calls even when the rate stays under the ceiling. The recurring tail on `gpt-oss-120b` is a small set of typo cases the model treats as fixes rather than misspellings - `craete -> create` and `compatrible -> compatible` showed up on every run - plus the odd collocation flag such as `remind about -> remind of`. The prompt is byte-locked to the measured `minimal-prompt.txt`, so this tail is left in place rather than patched.
+**Reproduce before trusting the exit code.** The model is nondeterministic, so one `--repeats 1` run is a single noisy sample of each case. Pass `--repeats N` to sample each case N times (each in its own isolated `GRAMMAR_HOME`) and gate on the mean rate across samples; a higher N is what makes the exit code stable enough to gate CI on. The floor and ceiling are environment-overridable for tuning. The silence gate is a rate rather than an absolute zero because the model is nondeterministic (`docs/requirements.md` section 7 measures FP "over several runs"). Consecutive single-sample live runs of `gpt-oss-120b` at build time landed the typo-silent class between 20% and 30% FP, straddling the 25% ceiling, so a single run can pass or fail on model noise alone; the ceiling still separates the accepted `gpt-oss-120b` from the rejected `gemini-3.1-flash-lite`, which leaked roughly half its typo cases. Every individual false positive is listed under its class so the maintainer can inspect debatable calls even when the rate stays under the ceiling. The recurring tail on `gpt-oss-120b` is a small set of typo cases the model treats as fixes rather than misspellings - `craete -> create` and `compatrible -> compatible` showed up on every run - plus the odd collocation flag such as `remind about -> remind of`. The prompt is byte-locked to the shipped `prompts/checker.txt`, so this tail is left in place rather than patched.
 
 ## Isolation
 
