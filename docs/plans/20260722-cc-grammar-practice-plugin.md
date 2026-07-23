@@ -215,12 +215,12 @@ No language placeholder in v1 (the prompt never named a specific native language
 
 - Create: `eval/run.py`, `eval/cases.jsonl`, `eval/README.md`
 
-- [ ] Port `run.py` from scratchpad: drive the real `hooks/grammar-check.sh` with `GRAMMAR_HOOK_SYNC=1`, read back the status file, score FP/recall per class, never pool; drop the `jq` requirement.
-- [ ] **`run.py` must set `GRAMMAR_HOME` to a fresh temp dir per run**, so evaluation never touches the user's real `history.jsonl` (otherwise the drill would start teaching the eval dataset).
-- [ ] Build a clean `cases.jsonl`: synthetic deterministic cases (typo-silent, injected-mutation-caught) plus anonymized real cases drawn from the archived old log's `YOU:` lines (identifiers substituted, prose untouched, labels assigned fresh). No private data.
-- [ ] `eval/README.md`: how to run, what the classes mean, the maintainer-tool framing.
-- [ ] Verify: `python3 eval/run.py` runs end to end against the shipped hook, prints a per-class summary, and exits non-zero on failures.
-- [ ] Verify (isolation): `~/.claude/cc-grammar-coach/history.jsonl` is byte-identical before and after a full eval run.
+- [x] Port `run.py` from scratchpad: drive the real `hooks/grammar-check.sh` with `GRAMMAR_HOOK_SYNC=1`, read back the status file, score FP/recall per class, never pool; drop the `jq` requirement. (scratchpad source gone; reconstructed from the Task 6 spec + D5; parses status on the exact `→` byte, categories from the isolated `history.jsonl`; classes never pooled; no jq)
+- [x] **`run.py` must set `GRAMMAR_HOME` to a fresh temp dir per run**, so evaluation never touches the user's real `history.jsonl` (otherwise the drill would start teaching the eval dataset). (mkdtemp per case, rmtree in finally; `CLAUDE_PLUGIN_ROOT` set, `GRAMMAR_HOOK_ACTIVE` popped)
+- [x] Build a clean `cases.jsonl`: synthetic deterministic cases (typo-silent, injected-mutation-caught) plus anonymized real cases drawn from the archived old log's `YOU:` lines (identifiers substituted, prose untouched, labels assigned fresh). No private data. (36 cases: 10 typo-silent, 8 name/mention-silent, 18 recall across all 7 categories; 21 synthetic / 15 real-derived; identifiers/paths/usernames scrubbed, prose grammar untouched)
+- [x] `eval/README.md`: how to run, what the classes mean, the maintainer-tool framing. (includes the `CLAUDE_PLUGIN_OPTION_*`/`LLM_*` cred export, per-class semantics, gate/exit-code reference, isolation guarantee)
+- [x] Verify: `python3 eval/run.py` runs end to end against the shipped hook, prints a per-class summary, and exits non-zero on failures. (live gpt-oss-120b run: per-class summary printed, real set PASS exit 0 with recall 18/18 and silence FP 20%/0% under the 25% ceiling; `--selftest` proves the non-zero path, exit 1)
+- [x] Verify (isolation): `~/.claude/cc-grammar-coach/history.jsonl` is byte-identical before and after a full eval run. (ABSENT before and ABSENT after the full run; per-case tempdir GRAMMAR_HOME guarantees it)
 
 ### Task 7: README and install docs
 
