@@ -164,11 +164,11 @@ No language placeholder in v1 (the prompt never named a specific native language
 
 - Create: `prompts/checker.txt`, `config/categories.txt`
 
-- [ ] Copy the validated prose prompt from scratchpad `minimal-prompt.txt` into `prompts/checker.txt`, preserving the `→`/`✔`/`✨` markers and the injection-defense line verbatim.
-- [ ] Replace the hardcoded category list with `{{CATEGORIES}}` and wrap the rephrase instruction in `{{REPHRASE_START}}` / `{{REPHRASE_END}}` (D5).
-- [ ] `config/categories.txt`: one slug per line - `articles`, `agreement`, `tense`, `prepositions`, `plural`, `verb-form`, `questions`.
-- [ ] Verify: render the prompt with defaults (`rephrase=true`) and `diff` it against the scratchpad `minimal-prompt.txt` - must be byte-identical, or the R6 measurements no longer apply.
-- [ ] Verify: render with `rephrase=false` and confirm the block and both delimiters are gone and no `✨` remains.
+- [x] Copy the validated prose prompt from scratchpad `minimal-prompt.txt` into `prompts/checker.txt`, preserving the `→`/`✔`/`✨` markers and the injection-defense line verbatim. (source survived at `docs/minimal-prompt.txt`, not scratchpad)
+- [x] Replace the hardcoded category list with `{{CATEGORIES}}` and wrap the rephrase instruction in `{{REPHRASE_START}}` / `{{REPHRASE_END}}` (D5).
+- [x] `config/categories.txt`: one slug per line - `articles`, `agreement`, `tense`, `prepositions`, `plural`, `verb-form`, `questions`. (trailing newline; renderer filters empties)
+- [x] Verify: render the prompt with defaults (`rephrase=true`) and `diff` it against the scratchpad `minimal-prompt.txt` - must be byte-identical, or the R6 measurements no longer apply. (zero diffs, both 2572 bytes)
+- [x] Verify: render with `rephrase=false` and confirm the block and both delimiters are gone and no `✨` remains. (grep: 0 for all three)
 
 ### Task 3: Checker hook
 
