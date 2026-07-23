@@ -176,17 +176,16 @@ No language placeholder in v1 (the prompt never named a specific native language
 
 - Create: `hooks/grammar-check.sh`
 
-- [ ] Implement the D4 flow, including the plugin-root fallback (D2), `mkdir -p` of state dirs, and `GRAMMAR_HOOK_SYNC` support.
-- [ ] Background the model call using the old hook's idiom (`) > /dev/null 2>&1 &` at `grammar-check.sh:325`) - the scratchpad probes are synchronous and are not a model for this.
-- [ ] Portability: language gate and timestamps via python3; no `grep -P`, `date -d`, or `jq`. No false-positive filters.
-- [ ] Write `history.jsonl` as a single atomic `>>` append of one line (R5). `chmod +x`.
-- [ ] Verify (invocation works standalone): run with an isolated env and confirm no crash and empty stdout:
-      `GRAMMAR_HOME=$(mktemp -d) GRAMMAR_HOOK_SYNC=1 CLAUDE_PLUGIN_OPTION_LLM_BASE_URL=... CLAUDE_PLUGIN_OPTION_LLM_API_KEY=... CLAUDE_PLUGIN_OPTION_LLM_MODEL=openai/gpt-oss-120b ./hooks/grammar-check.sh < payload.json`
-- [ ] Verify (silence): clean-English payload under `GRAMMAR_HOOK_SYNC=1` produces a `✔` line in the status file and no JSONL line.
-- [ ] Verify (flag): payload with one clear error (e.g. "he do it") produces a `[<category>] ... → ...` status line **and** one JSONL line whose `fixes[]` is non-empty (this is the arrow-mismatch canary).
-- [ ] Verify (capture/display split): with `CLAUDE_PLUGIN_OPTION_SHOW_FEEDBACK=false`, the JSONL line is still appended but the status file stays empty.
-- [ ] Verify (non-blocking): without `GRAMMAR_HOOK_SYNC`, the hook returns in under 1s while the status file is still written afterwards (poll up to 30s).
-- [ ] Verify (fresh install): all of the above pass with `GRAMMAR_HOME` pointed at an empty temp dir.
+- [x] Implement the D4 flow, including the plugin-root fallback (D2), `mkdir -p` of state dirs, and `GRAMMAR_HOOK_SYNC` support. (recursion guard exits 0 before writing any state; root derived from `${BASH_SOURCE[0]}/..` when env unset)
+- [x] Background the model call using the old hook's idiom (`) > /dev/null 2>&1 &` at `grammar-check.sh:325`) - the scratchpad probes are synchronous and are not a model for this. (idiom salvaged; `[ -n "$GRAMMAR_HOOK_SYNC" ] && wait`)
+- [x] Portability: language gate and timestamps via python3; no `grep -P`, `date -d`, or `jq`. No false-positive filters. (grep for `jq`/`grep -P`/`date -d`/`xdg-open` -> none; ts via `datetime.astimezone().isoformat`)
+- [x] Write `history.jsonl` as a single atomic `>>` append of one line (R5). `chmod +x`. (python emits one json line to stdout, bash `printf >>` appends it; executable)
+- [x] Verify (invocation works standalone): run with an isolated env and confirm no crash and empty stdout. (exit=0, stdout=0B against live gpt-oss-120b endpoint)
+- [x] Verify (silence): clean-English payload under `GRAMMAR_HOOK_SYNC=1` produces a `✔` line in the status file and no JSONL line. (status "✔ Clear and polite.", no history.jsonl)
+- [x] Verify (flag): payload with one clear error (e.g. "he do it") produces a `[<category>] ... → ...` status line **and** one JSONL line whose `fixes[]` is non-empty (this is the arrow-mismatch canary). (two `[agreement] ... → ...` lines + `✨` rephrase in status; 1 jsonl line, fixes[]=2)
+- [x] Verify (capture/display split): with `CLAUDE_PLUGIN_OPTION_SHOW_FEEDBACK=false`, the JSONL line is still appended but the status file stays empty. (status 0B, history 1 line)
+- [x] Verify (non-blocking): without `GRAMMAR_HOOK_SYNC`, the hook returns in under 1s while the status file is still written afterwards (poll up to 30s). (returned in 0.445s, status empty at return, appeared ~2.5s later)
+- [x] Verify (fresh install): all of the above pass with `GRAMMAR_HOME` pointed at an empty temp dir. (every check used a fresh `mktemp -d` home; PRAISE fallback and 4 gates also verified)
 
 ### Task 4: Statusline render function and wrapper
 
