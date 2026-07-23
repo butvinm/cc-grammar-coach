@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # render_grammar - print the grammar feedback segment for a session.
 #
 # Sourced, not executed. Reads "$GRAMMAR_HOME/status/$SID" (the file

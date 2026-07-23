@@ -6,7 +6,6 @@
 
 [ -n "$GRAMMAR_HOOK_ACTIVE" ] && exit 0
 
-# --- roots ---
 if [ -n "$CLAUDE_PLUGIN_ROOT" ]; then
   PLUGIN_ROOT="$CLAUDE_PLUGIN_ROOT"
 else
@@ -19,7 +18,9 @@ STATUS_DIR="$GRAMMAR_HOME/status"
 HISTORY_FILE="$GRAMMAR_HOME/history.jsonl"
 mkdir -p "$STATUS_DIR"
 
-# --- config (CLAUDE_PLUGIN_OPTION_* with D3 defaults) ---
+MIN_CHARS=15
+MAX_CHARS=500
+
 REPHRASE="${CLAUDE_PLUGIN_OPTION_REPHRASE:-true}"
 SHOW_FEEDBACK="${CLAUDE_PLUGIN_OPTION_SHOW_FEEDBACK:-true}"
 LLM_BASE_URL="${CLAUDE_PLUGIN_OPTION_LLM_BASE_URL:-}"
@@ -43,11 +44,10 @@ STATUS_FILE="$STATUS_DIR/$SID"
 : > "$STATUS_FILE"
 find "$STATUS_DIR" -type f -mtime +1 -delete 2>/dev/null
 
-# --- gates (R4) ---
 [ -z "$PROMPT" ] && exit 0
 case "$PROMPT" in /*) exit 0 ;; esac
-[ "${#PROMPT}" -lt 15 ] && exit 0
-[ "${#PROMPT}" -gt 500 ] && exit 0
+[ "${#PROMPT}" -lt "$MIN_CHARS" ] && exit 0
+[ "${#PROMPT}" -gt "$MAX_CHARS" ] && exit 0
 case "$PROMPT" in
   '<'*) exit 0 ;;
   *'<task-notification'*|*'<local-command'*|*'<command-name>'*|*'<system-reminder'*|*'<output-file>'*) exit 0 ;;
@@ -61,7 +61,6 @@ print("ok" if lat > 0 and cyr <= lat else "skip")
 ' 2>/dev/null)
 [ "$LANG_OK" != "ok" ] && exit 0
 
-# --- backgrounded model call ---
 export GRAMMAR_HOOK_ACTIVE=1
 (
   PROMPT_SYS=$(PLUGIN_ROOT="$PLUGIN_ROOT" REPHRASE="$REPHRASE" python3 -c '

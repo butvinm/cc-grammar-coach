@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Standalone grammar statusline: reads the stdin JSON Claude Code passes to a
 # statusLine command, extracts session_id, and prints the grammar feedback
 # segment. Wire it in via settings.json statusLine, or source render-grammar.sh
