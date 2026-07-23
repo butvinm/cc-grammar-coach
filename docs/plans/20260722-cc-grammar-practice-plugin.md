@@ -1,4 +1,4 @@
-# Build the cc-grammar-practice plugin
+# Build the cc-grammar-coach plugin
 
 ## Overview
 
@@ -15,8 +15,8 @@ This plan is self-contained: the requirements and design needed to execute it ar
 
 ## Context (from discovery)
 
-- Repo root: `/home/butvinm/Dev/cc-grammar-practice` (currently only `docs/`). Not yet a git repo.
-- Reusable artifacts in the session scratchpad `/tmp/claude-1000/-home-butvinm-Dev-cc-grammar-practice/43228289-01d3-4ca0-9155-6d9bd7694dd8/scratchpad/`:
+- Repo root: `/home/butvinm/Dev/cc-grammar-coach` (currently only `docs/`). Not yet a git repo.
+- Reusable artifacts in the session scratchpad `/tmp/claude-1000/-home-butvinm-Dev-cc-grammar-coach/43228289-01d3-4ca0-9155-6d9bd7694dd8/scratchpad/`:
   - `minimal-prompt.txt` - the validated v1 prose checker prompt (measured best). **Source of truth for prompt wording.**
   - `probe-hook-api.sh` - reference for the API call, gates, and status write. **Note: it is fully synchronous and is NOT a reference for backgrounding.**
   - `run.py`, `cases.jsonl` - the eval harness and the current (biased, to-be-replaced) case set.
@@ -101,7 +101,7 @@ No false-positive filters ship. Default model `openai/gpt-oss-120b`; zero-config
 ### D1. File tree
 
 ```
-cc-grammar-practice/
+cc-grammar-coach/
   .claude-plugin/{plugin.json, marketplace.json}
   hooks/{hooks.json, grammar-check.sh}
   skills/grammar-drill/{SKILL.md, scripts/build_drill.py, assets/{drill-template.html,duo.css}, references/syllabus.md}
@@ -117,7 +117,7 @@ cc-grammar-practice/
 ### D2. Two roots
 
 - Plugin root: `${CLAUDE_PLUGIN_ROOT}` when set; **otherwise derived from the script's own location** so the hook is runnable outside Claude Code for testing.
-- Grammar home: `~/.claude/cc-grammar-practice/`, overridable by `$GRAMMAR_HOME`. Holds `status/<session-id>`, `history.jsonl`, `curriculum.tsv`, `drills/`. **Every component creates the directories it writes to (`mkdir -p`)**; a fresh install has none of them. Fixed path because the non-plugin statusline cannot read plugin env vars. Status files older than one day are tidied.
+- Grammar home: `~/.claude/cc-grammar-coach/`, overridable by `$GRAMMAR_HOME`. Holds `status/<session-id>`, `history.jsonl`, `curriculum.tsv`, `drills/`. **Every component creates the directories it writes to (`mkdir -p`)**; a fresh install has none of them. Fixed path because the non-plugin statusline cannot read plugin env vars. Status files older than one day are tidied.
 
 ### D3. Config (all via userConfig in plugin.json)
 
@@ -152,7 +152,7 @@ No language placeholder in v1 (the prompt never named a specific native language
 - Create: `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `hooks/hooks.json`, `.gitignore`, `LICENSE`
 
 - [ ] `git init` on `master`; `.gitignore` (local test homes, `*.bak-*`, `drills/`); add `LICENSE` matching the manifest's declared license.
-- [ ] `plugin.json`: name `cc-grammar-practice`, version, description, **author** (the validator warns without it), repository, license, keywords, and the full `userConfig` block (D3) with `type`/`title`/`description`/`default` on every field.
+- [ ] `plugin.json`: name `cc-grammar-coach`, version, description, **author** (the validator warns without it), repository, license, keywords, and the full `userConfig` block (D3) with `type`/`title`/`description`/`default` on every field.
 - [ ] `hooks/hooks.json`: one `UserPromptSubmit` entry running `"${CLAUDE_PLUGIN_ROOT}"/hooks/grammar-check.sh` (quoted - the root may contain spaces), timeout 10s. Rely on convention discovery; do **not** also add a `hooks` field to `plugin.json`.
 - [ ] `marketplace.json`: list this one plugin from this repo.
 - [ ] Declare `llm_api_key` as `sensitive`. **Already verified** (throwaway probe plugin, 2026-07-22): sensitive values are injected into the hook env as `CLAUDE_PLUGIN_OPTION_<KEY>` while being stored outside `settings.json`, so credentials live in userConfig with no private-file fallback. No spike needed.
@@ -221,7 +221,7 @@ No language placeholder in v1 (the prompt never named a specific native language
 - [ ] Build a clean `cases.jsonl`: synthetic deterministic cases (typo-silent, injected-mutation-caught) plus anonymized real cases drawn from the archived old log's `YOU:` lines (identifiers substituted, prose untouched, labels assigned fresh). No private data.
 - [ ] `eval/README.md`: how to run, what the classes mean, the maintainer-tool framing.
 - [ ] Verify: `python3 eval/run.py` runs end to end against the shipped hook, prints a per-class summary, and exits non-zero on failures.
-- [ ] Verify (isolation): `~/.claude/cc-grammar-practice/history.jsonl` is byte-identical before and after a full eval run.
+- [ ] Verify (isolation): `~/.claude/cc-grammar-coach/history.jsonl` is byte-identical before and after a full eval run.
 
 ### Task 7: README and install docs
 
@@ -244,7 +244,7 @@ No language placeholder in v1 (the prompt never named a specific native language
 ### Task 9: Finalize documentation and migrate
 
 - [ ] Update `README.md` and `docs/` for anything discovered during the build.
-- [ ] Migration: point the install at `~/.claude/cc-grammar-practice/`; **archive** `~/.claude/grammar-feedback.log` and `grammar-trace.jsonl` outside the state dir (message corpus for the eval; never imported into `history.jsonl`); delete `grammar-stats.tsv`, `grammar-ignore.txt`, `grammar-llm.env`; remove the old hook and the grammar block from the personal statusline.
+- [ ] Migration: point the install at `~/.claude/cc-grammar-coach/`; **archive** `~/.claude/grammar-feedback.log` and `grammar-trace.jsonl` outside the state dir (message corpus for the eval; never imported into `history.jsonl`); delete `grammar-stats.tsv`, `grammar-ignore.txt`, `grammar-llm.env`; remove the old hook and the grammar block from the personal statusline.
 - [ ] Verify (post-migration): send a message and confirm the new install writes a status line and appends to the new `history.jsonl`, and that the archived log is untouched.
 - [ ] Move this plan to `docs/plans/completed/`.
 

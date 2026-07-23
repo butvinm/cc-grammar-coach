@@ -16,7 +16,7 @@ Three runtime components plus a maintainer tool:
 ## 2. File tree
 
 ```
-cc-grammar-practice/                    # repo root, plugin name = cc-grammar-practice
+cc-grammar-coach/                    # repo root, plugin name = cc-grammar-coach
   .claude-plugin/
     plugin.json                         # manifest + userConfig
     marketplace.json                    # for /plugin marketplace add
@@ -41,7 +41,7 @@ cc-grammar-practice/                    # repo root, plugin name = cc-grammar-pr
 ## 3. Two roots: static vs mutable
 
 - **Plugin root** (`${CLAUDE_PLUGIN_ROOT}`, read-only): all code and static assets - hook, prompt, categories, skill, statusline scripts, eval.
-- **Grammar home** (writable state): `~/.claude/cc-grammar-practice/`, overridable via `$GRAMMAR_HOME`.
+- **Grammar home** (writable state): `~/.claude/cc-grammar-coach/`, overridable via `$GRAMMAR_HOME`.
   Holds `status/<session-id>` (ephemeral feedback), `history.jsonl` (the drill's source), `curriculum.tsv`, and `drills/`.
 
 Grammar home is a **fixed path**, not `${CLAUDE_PLUGIN_DATA}`, because the statusline is not a plugin component and cannot see plugin env vars.
@@ -73,7 +73,7 @@ Only two, both semantically distinct:
 - `show_feedback` - the capture-vs-display split (Persona B runs capture with display off).
 - `rephrase` - the naturalness-channel off-switch (section 3.3 of requirements).
 
-There is no master enable toggle: `/plugin disable cc-grammar-practice` removes the hook, which is the same thing.
+There is no master enable toggle: `/plugin disable cc-grammar-coach` removes the hook, which is the same thing.
 
 ## 5. Checker hook flow (rewritten, ~90 lines vs 332)
 
@@ -107,9 +107,9 @@ Categories: `config/categories.txt` ships the English list in the plugin root an
 
 ## 8. Packaging
 
-- `plugin.json`: `name` cc-grammar-practice, plus version, description, author, homepage, repository, license, keywords, the `userConfig` block (section 4), and the hooks pointer.
+- `plugin.json`: `name` cc-grammar-coach, plus version, description, author, homepage, repository, license, keywords, the `userConfig` block (section 4), and the hooks pointer.
 - `hooks/hooks.json`: one `UserPromptSubmit` entry running `${CLAUDE_PLUGIN_ROOT}/hooks/grammar-check.sh` with a short timeout. The hook backgrounds the model call and returns immediately with empty stdout, so its synchronous part is fast and a ~10s timeout is ample.
-- `.claude-plugin/marketplace.json`: lists this one plugin from this repo, so `/plugin marketplace add <owner>/cc-grammar-practice` then `/plugin install` works, followed by the interactive userConfig prompts and the one manual statusline step.
+- `.claude-plugin/marketplace.json`: lists this one plugin from this repo, so `/plugin marketplace add <owner>/cc-grammar-coach` then `/plugin install` works, followed by the interactive userConfig prompts and the one manual statusline step.
 
 ## 9. Reuse vs rewrite, and migration
 
@@ -124,7 +124,7 @@ Reuse/rewrite map:
 
 Migration (maintainer's machine only; new users start empty):
 
-- State moves from flat `~/.claude/grammar-*` files to `~/.claude/cc-grammar-practice/`.
+- State moves from flat `~/.claude/grammar-*` files to `~/.claude/cc-grammar-coach/`.
 - The old `grammar-feedback.log` is **archived outside the state dir, never imported.** Its fix lines are unreliable (produced by the rejected prompt and model, which mislabels typos and invents wrong corrections), so it must not feed the drill: `history.jsonl` starts empty and the new checker refills it. But its `YOU:` lines are the maintainer's genuine traffic and the only existing source for the eval's anonymized real cases, where labels are assigned from scratch and the old bad labels never matter. Archive, do not delete.
 - The old flat files (`grammar-stats.tsv`, `grammar-ignore.txt`, `grammar-trace.jsonl`, `grammar-llm.env`) are removed; their roles are gone (no filters, no stats ranking) or moved (credentials to userConfig).
 - `curriculum.tsv` may be copied over if its topic history is still wanted; it is low-risk since it holds only week-to-topic mappings, not model output.
