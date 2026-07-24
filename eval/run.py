@@ -5,9 +5,7 @@ Drives the shipped hooks/grammar-check.sh against eval/cases.jsonl, one case per
 
 Scoring is per class and never pooled:
   - typo-silent        false-positive rate (a misspelling must NOT be flagged)
-
   - name/mention-silent false-positive rate (identifiers/paths/quoted mentions must stay silent)
-
   - recall (per grammar category) whether a known error is flagged, and whether it is flagged with the expected category
 
 Exit code is non-zero when any gate fails (silence classes must stay under a false-positive-rate ceiling; recall must clear a flagged-any floor and a pooled exact-category floor), so CI and the plan's Task 8 can gate.
@@ -20,9 +18,7 @@ Credentials: the hook needs a model. run.py forwards the LLM settings to the hoo
 
 Usage:
     python3 eval/run.py             # run the real dataset against the shipped hook
-
     python3 eval/run.py --repeats 3 # sample each case 3x and gate on the mean
-
     python3 eval/run.py --selftest  # prove the non-zero gate path, no network
 """
 
