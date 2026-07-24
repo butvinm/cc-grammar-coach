@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# UserPromptSubmit checker. Reviews each English message out of band, logs
-# mistakes to history.jsonl, and optionally writes statusline feedback.
-# Writes nothing to stdout and never blocks the turn: the model call is
-# backgrounded and the hook returns immediately (unless GRAMMAR_HOOK_SYNC).
+# UserPromptSubmit checker. Reviews each English message out of band, logs mistakes to history.jsonl, and optionally writes statusline feedback.
+# Writes nothing to stdout and never blocks the turn: the model call is backgrounded and the hook returns immediately (unless GRAMMAR_HOOK_SYNC).
 
 [ -n "$GRAMMAR_HOOK_ACTIVE" ] && exit 0
 
@@ -35,9 +33,7 @@ INPUT=$(cat)
 } < <(printf '%s' "$INPUT" | python3 -c 'import sys, json
 d = json.load(sys.stdin)
 sys.stdout.write((d.get("session_id") or "default") + "\n" + (d.get("prompt") or ""))' 2>/dev/null)
-# Harden the session id before it becomes a path component: a value carrying a
-# slash or ".." could escape status/. Real ids are Claude Code UUIDs; anything
-# else falls back to "default".
+# Harden the session id before it becomes a path component: a value carrying a slash or ".." could escape status/. Real ids are Claude Code UUIDs; anything else falls back to "default".
 case "$SID" in ''|*/*|*..*) SID=default ;; esac
 
 STATUS_FILE="$STATUS_DIR/$SID"
@@ -97,9 +93,7 @@ print(json.dumps({
     ],
 }))
 ')
-    # The Authorization header carries the key via a curl config read from stdin
-    # (the shell writes the here-doc straight to curl), so the secret never lands
-    # in any process argv where `ps` could read it.
+    # The Authorization header carries the key via a curl config read from stdin (the shell writes the here-doc straight to curl), so the secret never lands in any process argv where `ps` could read it.
     RESP=$(curl -s --max-time 60 "$LLM_BASE_URL/chat/completions" \
       -H "Content-Type: application/json" -d "$PAYLOAD" --config - <<EOF
 header = "Authorization: Bearer $LLM_API_KEY"

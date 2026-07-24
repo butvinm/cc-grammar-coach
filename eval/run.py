@@ -1,39 +1,28 @@
 #!/usr/bin/env python3
 """Maintainer regression harness for the cc-grammar-coach checker hook.
 
-Drives the shipped hooks/grammar-check.sh against eval/cases.jsonl, one case
-per invocation, with GRAMMAR_HOOK_SYNC=1 so the backgrounded model call is
-awaited before the hook returns. Each run gets a fresh GRAMMAR_HOME temp dir,
-so the eval never touches the user's real ~/.claude/cc-grammar-coach state.
+Drives the shipped hooks/grammar-check.sh against eval/cases.jsonl, one case per invocation, with GRAMMAR_HOOK_SYNC=1 so the backgrounded model call is awaited before the hook returns. Each run gets a fresh GRAMMAR_HOME temp dir, so the eval never touches the user's real ~/.claude/cc-grammar-coach state.
 
 Scoring is per class and never pooled:
   - typo-silent        false-positive rate (a misspelling must NOT be flagged)
-  - name/mention-silent false-positive rate (identifiers/paths/quoted mentions
-                        must stay silent)
-  - recall (per grammar category) whether a known error is flagged, and whether
-                        it is flagged with the expected category
 
-Exit code is non-zero when any gate fails (silence classes must stay under a
-false-positive-rate ceiling; recall must clear a flagged-any floor and a pooled
-exact-category floor), so CI and the plan's Task 8 can gate.
+  - name/mention-silent false-positive rate (identifiers/paths/quoted mentions must stay silent)
 
-The model is nondeterministic, so a single sample of each case is noisy: the
-exit code of one --repeats 1 run is not by itself authoritative. Reproduce a
-result before trusting it, or raise --repeats so the gate reads a mean over N
-independent samples per case (each in its own isolated GRAMMAR_HOME).
+  - recall (per grammar category) whether a known error is flagged, and whether it is flagged with the expected category
+
+Exit code is non-zero when any gate fails (silence classes must stay under a false-positive-rate ceiling; recall must clear a flagged-any floor and a pooled exact-category floor), so CI and the plan's Task 8 can gate.
+
+The model is nondeterministic, so a single sample of each case is noisy: the exit code of one --repeats 1 run is not by itself authoritative. Reproduce a result before trusting it, or raise --repeats so the gate reads a mean over N independent samples per case (each in its own isolated GRAMMAR_HOME).
 
 No jq. Deps: python3, plus whatever the hook itself needs (bash, curl).
 
-Credentials: the hook needs a model. run.py forwards the LLM settings to the
-hook as CLAUDE_PLUGIN_OPTION_LLM_BASE_URL / _LLM_API_KEY / _LLM_MODEL, read
-from the environment. It accepts either the CLAUDE_PLUGIN_OPTION_* names or the
-plain LLM_BASE_URL / LLM_API_KEY / LLM_MODEL names (as exported by a private
-grammar-llm.env). Nothing is hardcoded. With no key set the hook falls back to
-`claude -p` haiku, which the harness also tolerates.
+Credentials: the hook needs a model. run.py forwards the LLM settings to the hook as CLAUDE_PLUGIN_OPTION_LLM_BASE_URL / _LLM_API_KEY / _LLM_MODEL, read from the environment. It accepts either the CLAUDE_PLUGIN_OPTION_* names or the plain LLM_BASE_URL / LLM_API_KEY / LLM_MODEL names (as exported by a private grammar-llm.env). Nothing is hardcoded. With no key set the hook falls back to `claude -p` haiku, which the harness also tolerates.
 
 Usage:
     python3 eval/run.py             # run the real dataset against the shipped hook
+
     python3 eval/run.py --repeats 3 # sample each case 3x and gate on the mean
+
     python3 eval/run.py --selftest  # prove the non-zero gate path, no network
 """
 
@@ -44,9 +33,7 @@ import subprocess
 import sys
 import tempfile
 
-# --- protocol markers (R3): must be byte-identical to the prompt, the hook,
-# and the statusline. Anchored here so Task 8's cross-file byte-identity grep
-# has a copy in this file even though scoring now reads history.jsonl. ---
+# --- protocol markers (R3): must be byte-identical to the prompt, the hook, and the statusline. Anchored here so Task 8's cross-file byte-identity grep has a copy in this file even though scoring now reads history.jsonl. ---
 ARROW = "→"    # -> separates wrong from fix
 CHECK = "✔"    # praise / liveness
 SPARKLE = "✨"  # rephrase
@@ -59,29 +46,16 @@ CASES = os.path.join(HERE, "cases.jsonl")
 
 PER_CASE_TIMEOUT = 90
 MIN_RECALL = float(os.environ.get("GRAMMAR_EVAL_MIN_RECALL", "0.7"))
-# The model is nondeterministic (requirements section 7: "FP-rate ... over
-# several runs"), and this harness samples each case once (repeats-per-case is a
-# deferred open question). A per-class silence false-positive *rate* ceiling
-# therefore absorbs single-run noise while still catching a materially worse
-# model - the rejected gemini failed ~55% of typo-silence. Every FP is still
-# listed in the report for the maintainer to inspect.
+# The model is nondeterministic (requirements section 7: "FP-rate ... over several runs"), and this harness samples each case once (repeats-per-case is a deferred open question). A per-class silence false-positive *rate* ceiling therefore absorbs single-run noise while still catching a materially worse model - the rejected gemini failed ~55% of typo-silence. Every FP is still listed in the report for the maintainer to inspect.
 MAX_SILENT_FP_RATE = float(os.environ.get("GRAMMAR_EVAL_MAX_SILENT_FP_RATE", "0.25"))
-# Exact-category recall floor: the fraction of recall samples flagged with their
-# OWN category slug, pooled across all categories. This is the gate against a
-# model that catches every error but files them all under one wrong slug (which
-# would still score 100% on the flagged-any floor below). It is pooled, not
-# per-category, because category naming is stochastic - a single category can
-# score zero exact hits on one sample by chance (tense <-> verb-form overlap),
-# so a strict per-category zero-fail would be flaky. Pooling separates a healthy
-# model (~0.9 exact) from mislabel-everything (~0.17) with wide margin.
+# Exact-category recall floor: the fraction of recall samples flagged with their OWN category slug, pooled across all categories. This is the gate against a model that catches every error but files them all under one wrong slug (which would still score 100% on the flagged-any floor below). It is pooled, not per-category, because category naming is stochastic - a single category can score zero exact hits on one sample by chance (tense <-> verb-form overlap), so a strict per-category zero-fail would be flaky. Pooling separates a healthy model (~0.9 exact) from mislabel-everything (~0.17) with wide margin.
 MIN_EXACT_RECALL = float(os.environ.get("GRAMMAR_EVAL_MIN_EXACT_RECALL", "0.5"))
 
 
 def forward_creds(env):
     """Populate CLAUDE_PLUGIN_OPTION_LLM_* from the environment.
 
-    Prefer the CLAUDE_PLUGIN_OPTION_* names if already set; otherwise map the
-    plain LLM_* names (as a sourced grammar-llm.env exports them).
+    Prefer the CLAUDE_PLUGIN_OPTION_* names if already set; otherwise map the plain LLM_* names (as a sourced grammar-llm.env exports them).
     """
     pairs = [
         ("CLAUDE_PLUGIN_OPTION_LLM_BASE_URL", "LLM_BASE_URL"),
@@ -110,10 +84,7 @@ def load_cases(path):
 def run_hook(message, case_id):
     """Invoke the shipped hook once for one message in a fresh GRAMMAR_HOME.
 
-    Returns (flagged, categories). flagged is whether the isolated history.jsonl
-    recorded any fix (the authoritative signal - the status file is a display
-    subset of the same match, so it adds nothing); categories is the set of
-    category slugs seen.
+    Returns (flagged, categories). flagged is whether the isolated history.jsonl recorded any fix (the authoritative signal - the status file is a display subset of the same match, so it adds nothing); categories is the set of category slugs seen.
     """
     home = tempfile.mkdtemp(prefix="grammar-eval-")
     try:
@@ -156,11 +127,7 @@ def run_hook(message, case_id):
 def evaluate(results):
     """Aggregate per-class stats over N repeats per case and decide pass/fail.
 
-    results is a list of per-case dicts: {case, runs, flag_count, exact_count}
-    where flag_count is how many of the `runs` samples flagged, and exact_count
-    is how many flagged with the case's own category (recall cases only).
-    Rates are means over samples (sum of flags / sum of runs), so they absorb
-    single-sample noise as `runs` grows. Returns (report_lines, ok).
+    results is a list of per-case dicts: {case, runs, flag_count, exact_count} where flag_count is how many of the `runs` samples flagged, and exact_count is how many flagged with the case's own category (recall cases only). Rates are means over samples (sum of flags / sum of runs), so they absorb single-sample noise as `runs` grows. Returns (report_lines, ok).
     """
     typo = [r for r in results if r["case"]["class"] == "typo-silent"]
     name = [r for r in results if r["case"]["class"] == "name-silent"]
@@ -221,9 +188,7 @@ def evaluate(results):
         ok = False
         lines.append("      -> FAIL: flagged recall %.0f%% below floor %.0f%%"
                      % (flag_rate * 100, MIN_RECALL * 100))
-    # Exact-category gate (T2): a model that files every error under one slug
-    # still clears the flagged-any floor, so pool exact-category recall and floor
-    # it. Pooled (not per-category) because single-category naming is stochastic.
+    # Exact-category gate (T2): a model that files every error under one slug still clears the flagged-any floor, so pool exact-category recall and floor it. Pooled (not per-category) because single-category naming is stochastic.
     if exact_rate < MIN_EXACT_RECALL:
         ok = False
         lines.append("      -> FAIL: exact-category recall %.0f%% below floor %.0f%% (errors flagged under the wrong category)"
@@ -235,8 +200,7 @@ def evaluate(results):
 def run_selftest():
     """Prove the non-zero gate path deterministically, without the model.
 
-    Feeds fabricated results (a silence false positive and a recall miss)
-    through the real evaluate() gate and confirms it fails.
+    Feeds fabricated results (a silence false positive and a recall miss) through the real evaluate() gate and confirms it fails.
     """
     print("SELFTEST: running the gate on fabricated failing results (no network)\n")
     fake = [

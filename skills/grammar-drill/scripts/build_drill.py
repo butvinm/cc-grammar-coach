@@ -3,11 +3,7 @@
 
 Usage: build_drill.py <data.json> [output.html]
 
-Validates the drill data, injects it into assets/drill-template.html along with
-assets/duo.css, writes the page to $GRAMMAR_HOME/drills/drill-<date>-<HHMM>.html
-(GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach; an explicit output path
-overrides both), and prints the path. Opening the page is the caller's job, so
-that building it can be scripted without spawning a browser. Stdlib only.
+Validates the drill data, injects it into assets/drill-template.html along with assets/duo.css, writes the page to $GRAMMAR_HOME/drills/drill-<date>-<HHMM>.html (GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach; an explicit output path overrides both), and prints the path. Opening the page is the caller's job, so that building it can be scripted without spawning a browser. Stdlib only.
 """
 
 import json
@@ -78,8 +74,7 @@ def main() -> None:
 
     assets = Path(__file__).parent.parent / "assets"
     template = (assets / "drill-template.html").read_text(encoding="utf-8")
-    # duo.css is inlined rather than linked: the page is written to a different
-    # directory than the assets and has to stand alone.
+    # duo.css is inlined rather than linked: the page is written to a different directory than the assets and has to stand alone.
     page = template.replace(CSS_PLACEHOLDER, (assets / "duo.css").read_text(encoding="utf-8"))
     # Escaping '</' keeps any '</script>' inside drill strings from ending the script tag.
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")

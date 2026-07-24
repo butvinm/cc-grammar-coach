@@ -1,15 +1,11 @@
 #!/usr/bin/env bash
 # render_grammar - print the grammar feedback segment for a session.
 #
-# Sourced, not executed. Reads "$GRAMMAR_HOME/status/$SID" (the file
-# grammar-check.sh writes) and colours each line by the marker it carries so
-# suggestions do not read as errors:
+# Sourced, not executed. Reads "$GRAMMAR_HOME/status/$SID" (the file grammar-check.sh writes) and colours each line by the marker it carries so suggestions do not read as errors:
 #   ✔ cheer            green   (nothing to fix)
 #   ✨ native rephrase  green   (a more native rewrite of the whole message)
 #   [category] fix     split per part, see render_fix_line below
-# Anything unrecognised falls back to red, so a new line type shows up loudly
-# rather than being silently mis-coloured. Long lines are soft-wrapped to the
-# terminal width on word boundaries so nothing gets truncated.
+# Anything unrecognised falls back to red, so a new line type shows up loudly rather than being silently mis-coloured. Long lines are soft-wrapped to the terminal width on word boundaries so nothing gets truncated.
 #
 # GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach and is overridable.
 
@@ -87,8 +83,7 @@ render_grammar() {
                 ;;
             *)         LINE_COLOR=$RED ;;
         esac
-        # Word-wrap by character count (UTF-8 aware); a single token longer than
-        # WIDTH is emitted as-is rather than hard-split mid-word.
+        # Word-wrap by character count (UTF-8 aware); a single token longer than WIDTH is emitted as-is rather than hard-split mid-word.
         awk -v W="$WIDTH" '{
             n=split($0,w," "); line="";
             for(i=1;i<=n;i++){
