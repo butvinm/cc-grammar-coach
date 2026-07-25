@@ -12,8 +12,7 @@ The checker never blocks your turn and never writes to the conversation: it runs
 ## Requirements
 
 - `bash`, `python3`, and `curl` (used by the hook; no `jq` required).
-- A grammar model. Either an OpenAI-compatible chat-completions endpoint (recommended: `openai/gpt-oss-120b`), or nothing at all, in which case the hook falls back to the local `claude -p` haiku CLI with zero configuration.
-- `hunspell` and the `claude` CLI are optional.
+- A grammar model: an OpenAI-compatible chat-completions endpoint (recommended: `openai/gpt-oss-120b`). This is **required** - the checker stays inactive until the base URL, model, and API key are configured.
 - Linux or macOS.
 
 ## Install
@@ -34,9 +33,9 @@ On install, Claude Code prompts you for the plugin's settings. Each maps to a `u
 
 - **Native language** (`native_language`) - your first language, e.g. `Russian`. The drill uses it to explain English rules by contrast with the habits your language creates (no articles, freer word order, aspect instead of tense, and so on). **No default:** leave it empty for generic, language-neutral lessons that assume no nationality. The checker ignores this field entirely.
 - **Suggest rephrasings** (`rephrase`, default **true**) - when on, the checker may add one `✨` line rewriting a clearly awkward message more naturally. Grammar flags appear regardless of this setting; only the extra rewrite is gated by it.
-- **LLM base URL** (`llm_base_url`) - the base URL of an OpenAI-compatible endpoint. The hook calls `<base-url>/chat/completions`, so include the version segment, e.g. `https://your-host/v1`. **Leave empty** to fall back to the local `claude -p` (haiku) CLI.
+- **LLM base URL** (`llm_base_url`) - the base URL of an OpenAI-compatible endpoint. The hook calls `<base-url>/chat/completions`, so include the version segment, e.g. `https://your-host/v1`. **Required**: the checker stays inactive until it is set.
 - **LLM model** (`llm_model`, default **`openai/gpt-oss-120b`**) - the model identifier sent to that endpoint.
-- **LLM API key** (`llm_api_key`) - the bearer key for the endpoint. Marked **sensitive**: it is stored outside `settings.json` and injected into the hook's environment only. The endpoint path activates only when the base URL, model, and key are all set; otherwise the hook uses the haiku fallback.
+- **LLM API key** (`llm_api_key`) - the bearer key for the endpoint. Marked **sensitive**: it is stored outside `settings.json` and injected into the hook's environment only. The checker activates only when the base URL, model, and key are all set; until then it checks nothing and logs nothing.
 
 You can change any of these later from the `/plugin` menu.
 
@@ -80,7 +79,7 @@ fi
 | ----------------- | ------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `native_language` | string             | _(none)_              | Drill uses it to explain English by contrast with your first language; empty means generic lessons. Not read by the checker. |
 | `rephrase`        | boolean            | `true`                | Allow the checker to append one `✨` natural-rewrite line for clearly awkward messages.                                      |
-| `llm_base_url`    | string             | _(none)_              | OpenAI-compatible endpoint base URL; empty falls back to `claude -p` haiku.                                                  |
+| `llm_base_url`    | string             | _(none)_              | OpenAI-compatible endpoint base URL; required, the checker is inactive without it.                                           |
 | `llm_model`       | string             | `openai/gpt-oss-120b` | Model id sent to the endpoint.                                                                                               |
 | `llm_api_key`     | string (sensitive) | _(none)_              | Bearer key for the endpoint; stored outside `settings.json`.                                                                 |
 
@@ -126,11 +125,11 @@ The skill has two modes. **Drill** (default) ranks your recent weak spots from `
 
 The default model is **`openai/gpt-oss-120b`**, chosen by measurement: it was silent on every typo and name/mention case, had the best recall, and returned in ~1.4s at the median. That ~1.4s is the model's raw p50; the shipped hook's end-to-end wall-clock (python subprocess spawns plus the round-trip to a remote endpoint) measured roughly **2-4s, median ~3s**, so feedback lands a few seconds after you send a message, not instantly. Because the call is backgrounded, none of that latency ever blocks your turn. See `eval/` for the harness and dataset behind the model choice.
 
-With **no API key configured**, the hook needs zero setup and falls back to `claude -p` with haiku. That path is slower and less strict about output format, but works offline of any custom endpoint. A **custom OpenAI-compatible endpoint** is opt-in: set the base URL, model, and key, and vet it with `eval/run.py` before trusting it.
+There is **no zero-config fallback**: with no endpoint configured the checker simply does nothing (earlier versions fell back to a local `claude -p` haiku call, but its output-format compliance was too low - measured ~60%, see `docs/requirements.md` section 6 - so fixes were silently dropped and history lost; a checker that visibly requires configuration beats one that silently half-works). When switching to a different endpoint or model, vet it with `eval/run.py` before trusting it.
 
 ## Troubleshooting
 
-**No feedback in the statusline?** The display needs the one-time wiring: run `/cc-grammar-coach:install-statusline`. To check the pipeline yourself: the checker's raw output for a session lives in `~/.claude/cc-grammar-coach/status/<session-id>` (written a few seconds after each English message), and the mistake log in `~/.claude/cc-grammar-coach/history.jsonl`. Fresh files there mean the checker works and only the display is unwired; no files there mean the hook itself is not running (is the plugin enabled?). Capture works even while the display is unwired, so no history is lost either way - and you can always just describe the symptom to Claude and let it walk this chain for you.
+**No feedback in the statusline?** Two usual causes: the display needs the one-time wiring (run `/cc-grammar-coach:install-statusline`), and the checker needs LLM credentials (set the base URL, model, and API key in the plugin config - without them it checks nothing). To check the pipeline yourself: the checker's raw output for a session lives in `~/.claude/cc-grammar-coach/status/<session-id>` (written a few seconds after each English message), and the mistake log in `~/.claude/cc-grammar-coach/history.jsonl`. Fresh files there mean the checker works and only the display is unwired; no files there mean the hook itself is not running (is the plugin enabled?). Capture works even while the display is unwired, so no history is lost either way - and you can always just describe the symptom to Claude and let it walk this chain for you.
 
 ## License
 

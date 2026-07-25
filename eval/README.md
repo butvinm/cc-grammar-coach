@@ -28,7 +28,7 @@ python3 eval/run.py               # one sample per case (fast, noisy)
 python3 eval/run.py --repeats 3   # three samples per case, gate on the mean
 ```
 
-With no key set, the hook falls back to `claude -p` haiku and the harness tolerates it (slower, lower format compliance - see `docs/requirements.md` section 6).
+Credentials are required: the hook has no model fallback (the old `claude -p` haiku path was dropped for its ~60% format compliance - see `docs/requirements.md` section 6), so `run.py` exits early when they are missing instead of measuring a hook that silently checks nothing.
 
 Prove the non-zero gate path without touching the network:
 

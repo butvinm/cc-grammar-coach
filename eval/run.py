@@ -14,7 +14,7 @@ The model is nondeterministic, so a single sample of each case is noisy: the exi
 
 No jq. Deps: python3, plus whatever the hook itself needs (bash, curl).
 
-Credentials: the hook needs a model. run.py forwards the LLM settings to the hook as CLAUDE_PLUGIN_OPTION_LLM_BASE_URL / _LLM_API_KEY / _LLM_MODEL, read from the environment. It accepts either the CLAUDE_PLUGIN_OPTION_* names or the plain LLM_BASE_URL / LLM_API_KEY / LLM_MODEL names (as exported by a private grammar-llm.env). Nothing is hardcoded. With no key set the hook falls back to `claude -p` haiku, which the harness also tolerates.
+Credentials: the hook needs a model. run.py forwards the LLM settings to the hook as CLAUDE_PLUGIN_OPTION_LLM_BASE_URL / _LLM_API_KEY / _LLM_MODEL, read from the environment. It accepts either the CLAUDE_PLUGIN_OPTION_* names or the plain LLM_BASE_URL / LLM_API_KEY / LLM_MODEL names (as exported by a private grammar-llm.env). Nothing is hardcoded. Credentials are required: the hook has no model fallback and exits early without them, so the harness refuses to run rather than measure a hook that silently checks nothing.
 
 Usage:
     python3 eval/run.py             # run the real dataset against the shipped hook
@@ -88,7 +88,6 @@ def run_hook(message, case_id):
         env["GRAMMAR_HOME"] = home
         env["GRAMMAR_HOOK_SYNC"] = "1"
         env["CLAUDE_PLUGIN_ROOT"] = PLUGIN_ROOT
-        env.pop("GRAMMAR_HOOK_ACTIVE", None)
         forward_creds(env)
 
         payload = json.dumps({"session_id": case_id, "prompt": message})
@@ -240,8 +239,10 @@ def main():
     repeats = parse_repeats(sys.argv[1:])
     cases = load_cases(CASES)
     have_key = bool(os.environ.get("CLAUDE_PLUGIN_OPTION_LLM_API_KEY") or os.environ.get("LLM_API_KEY"))
+    have_url = bool(os.environ.get("CLAUDE_PLUGIN_OPTION_LLM_BASE_URL") or os.environ.get("LLM_BASE_URL"))
+    if not (have_key and have_url):
+        sys.exit("LLM credentials required: export LLM_BASE_URL and LLM_API_KEY (or the CLAUDE_PLUGIN_OPTION_* names) - the hook has no model fallback and exits early without them")
     print("cc-grammar-coach eval: %d cases x %d repeat(s) against %s" % (len(cases), repeats, HOOK))
-    print("model path: %s" % ("custom endpoint (LLM_* forwarded)" if have_key else "claude -p haiku fallback"))
     if repeats == 1:
         print("note: single sample per case - the model is nondeterministic; reproduce before trusting the exit code")
     print()

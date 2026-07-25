@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "cc-grammar-coach",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Out-of-band English grammar checker (UserPromptSubmit hook) that logs your mistakes and shows statusline feedback, plus a drill skill that turns the log into a lesson-and-quiz web page. After installing, run /cc-grammar-coach:install-statusline once to wire the feedback into your statusline.",
   "author": {
     "name": "Mikhail Butvin"
@@ -25,7 +25,7 @@
     "llm_base_url": {
       "type": "string",
       "title": "LLM base URL",
-      "description": "OpenAI-compatible chat-completions endpoint base URL for the checker. Leave empty to fall back to the local `claude -p` (haiku) CLI."
+      "description": "OpenAI-compatible chat-completions endpoint base URL for the checker. Required: the checker stays inactive until the base URL, model, and API key are all set."
     },
     "llm_model": {
       "type": "string",

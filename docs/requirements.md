@@ -137,7 +137,7 @@ Measured: minimal prompt, zero filters, 49 local cases, one run each, four model
 
 - **No false-positive filters ship.** Every strong model passes the typo/name/mention classes unaided; only gemini needed the filters, and it is rejected (it also invents wrong corrections).
 - **Default model: `gpt-oss-120b`** (no filters, best recall, ~96% format, flat low latency, cheap).
-- **Zero-config fallback: `claude -p` haiku** (no key, reliable content, but ~10s and ~60% format).
+- **Zero-config fallback: `claude -p` haiku** (no key, reliable content, but ~10s and ~60% format). _Superseded 2026-07-26: the fallback shipped in 0.1.0 and was removed in 0.3.0 - the ~60% format compliance meant fixes were silently dropped and history lost, so the endpoint is now required and the checker stays inactive without credentials._
 - **Custom endpoint is opt-in**, vetted by the eval (`gpt-oss-120b` tested-good, `gemini-3.1-flash-lite` tested-bad).
 - Format compliance is model-dependent, not inherent; tolerating the occasional bare line is enough.
 

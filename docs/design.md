@@ -77,13 +77,13 @@ There is no master enable toggle either: `/plugin disable cc-grammar-coach` remo
 
 ## 5. Checker hook flow (rewritten, ~90 lines vs 332)
 
-1. Recursion guard: `GRAMMAR_HOOK_ACTIVE` set -> exit (the `claude -p` fallback would otherwise re-fire this hook).
-2. Resolve `$GRAMMAR_HOME`; read settings from `CLAUDE_PLUGIN_OPTION_*` env vars.
+1. Resolve `$GRAMMAR_HOME`; refresh the stable statusline-script copies (section 6); read settings from `CLAUDE_PLUGIN_OPTION_*` env vars.
+2. Credentials gate: exit unless the base URL and API key are both set. There is no zero-config model fallback - the earlier `claude -p` haiku path was removed because its ~60% format compliance (requirements section 6) silently dropped fixes and lost history; a checker that visibly requires configuration beats one that silently half-works. This also killed the `GRAMMAR_HOOK_ACTIVE` recursion guard, whose only purpose was to stop the `claude -p` call from re-firing this hook.
 3. Parse stdin JSON with python3 (prompt, session_id). Clear `status/<sid>`; tidy status files older than a day.
 4. Gates (portable): empty, slash-command, under 15 or over 500 chars, leading `<` or system-injected tags, and the language ratio. The language gate moves to python3 counting Latin vs Cyrillic, which removes `grep -P`.
 5. Background block, empty stdout:
    a. Build the prompt: `${CLAUDE_PLUGIN_ROOT}/prompts/checker.txt`, with the category list, native and target language, and the rephrase step included only when `rephrase=on`.
-   b. Call the model: API path (curl plus python3 for JSON) when credentials are present, else `claude -p` haiku under the recursion guard.
+   b. Call the model: curl plus python3 for JSON against the configured endpoint.
    c. Light sanitation only: strip `**` and backticks, drop blank lines. No filters.
    d. Capture: if the result carries any fix or rephrase, append one JSONL line to `history.jsonl`.
    e. Display: always write `status/<sid>`, with the praise-liveness fallback on the clean case. Whether anything shows is decided solely by the statusline wiring (section 6).

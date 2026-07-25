@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# UserPromptSubmit checker. Reviews each English message out of band, logs mistakes to history.jsonl, and optionally writes statusline feedback.
+# UserPromptSubmit checker. Reviews each English message out of band, logs mistakes to history.jsonl, and writes statusline feedback.
 # Writes nothing to stdout and never blocks the turn: the model call is backgrounded and the hook returns immediately (unless GRAMMAR_HOOK_SYNC).
-
-[ -n "$GRAMMAR_HOOK_ACTIVE" ] && exit 0
 
 if [ -n "$CLAUDE_PLUGIN_ROOT" ]; then
   PLUGIN_ROOT="$CLAUDE_PLUGIN_ROOT"
@@ -30,6 +28,9 @@ REPHRASE="${CLAUDE_PLUGIN_OPTION_REPHRASE:-true}"
 LLM_BASE_URL="${CLAUDE_PLUGIN_OPTION_LLM_BASE_URL:-}"
 LLM_MODEL="${CLAUDE_PLUGIN_OPTION_LLM_MODEL:-openai/gpt-oss-120b}"
 LLM_API_KEY="${CLAUDE_PLUGIN_OPTION_LLM_API_KEY:-}"
+
+# The checker needs a configured endpoint; without credentials there is nothing to call, so stop after the statusline-copy refresh above.
+{ [ -n "$LLM_BASE_URL" ] && [ -n "$LLM_API_KEY" ]; } || exit 0
 
 # --- parse stdin (one python pass: session_id on line 1, then the raw prompt) ---
 INPUT=$(cat)
@@ -63,7 +64,6 @@ print("ok" if lat > 0 and cyr <= lat else "skip")
 ' 2>/dev/null)
 [ "$LANG_OK" != "ok" ] && exit 0
 
-export GRAMMAR_HOOK_ACTIVE=1
 (
   PROMPT_SYS=$(PLUGIN_ROOT="$PLUGIN_ROOT" REPHRASE="$REPHRASE" python3 -c '
 import os
@@ -86,9 +86,7 @@ import sys
 sys.stdout.write("\n".join(out).replace("{{CATEGORIES}}", ", ".join(cats)))
 ')
 
-  FEEDBACK=""
-  if [ -n "$LLM_API_KEY" ] && [ -n "$LLM_BASE_URL" ]; then
-    PAYLOAD=$(MODEL="$LLM_MODEL" SYS="$PROMPT_SYS" USR="$PROMPT" python3 -c '
+  PAYLOAD=$(MODEL="$LLM_MODEL" SYS="$PROMPT_SYS" USR="$PROMPT" python3 -c '
 import os, json
 print(json.dumps({
     "model": os.environ["MODEL"],
@@ -99,24 +97,19 @@ print(json.dumps({
     ],
 }))
 ')
-    # The Authorization header carries the key via a curl config read from stdin (the shell writes the here-doc straight to curl), so the secret never lands in any process argv where `ps` could read it.
-    RESP=$(curl -s --max-time 60 "$LLM_BASE_URL/chat/completions" \
-      -H "Content-Type: application/json" -d "$PAYLOAD" --config - <<EOF
+  # The Authorization header carries the key via a curl config read from stdin (the shell writes the here-doc straight to curl), so the secret never lands in any process argv where `ps` could read it.
+  RESP=$(curl -s --max-time 60 "$LLM_BASE_URL/chat/completions" \
+    -H "Content-Type: application/json" -d "$PAYLOAD" --config - <<EOF
 header = "Authorization: Bearer $LLM_API_KEY"
 EOF
 )
-    FEEDBACK=$(printf '%s' "$RESP" | python3 -c '
+  FEEDBACK=$(printf '%s' "$RESP" | python3 -c '
 import sys, json
 try:
     sys.stdout.write(json.load(sys.stdin)["choices"][0]["message"]["content"] or "")
 except Exception:
     pass
 ' 2>/dev/null)
-  fi
-
-  if [ -z "$FEEDBACK" ]; then
-    FEEDBACK=$(printf 'Text: %s' "$PROMPT" | claude -p --model claude-haiku-4-5-20251001 "$PROMPT_SYS" 2>/dev/null)
-  fi
 
   JLINE=$(FB="$FEEDBACK" MSG="$PROMPT" STATUS="$STATUS_FILE" python3 -c '
 import os, sys, re, json, datetime
