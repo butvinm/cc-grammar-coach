@@ -5,7 +5,7 @@ An English grammar coach for Claude Code, in two parts:
 - a **checker** hook that reviews every English message you send, out of band, logs the mistakes it finds, and can show short feedback in your statusline;
 - a **drill** skill that turns those logged mistakes into a personalized lesson-and-quiz web page.
 
-The checker never blocks your turn and never writes to the conversation: it runs the model call in the background and returns immediately, so the only place you see feedback is the statusline (and only if you opt in). Everything it logs feeds the drill, so even with feedback turned off it keeps building material to practice from.
+The checker never blocks your turn and never writes to the conversation: it runs the model call in the background and returns immediately, so the only place you see feedback is the statusline (wired once with `/cc-grammar-coach:install-statusline`). Everything it logs feeds the drill, so even before the statusline is wired it keeps building material to practice from.
 
 **v1 teaches English only.** The target language is fixed to English throughout: the prompt, the mistake categories, the syllabus, and the eval are all English-specific. A configurable target language is planned for v2 and is not available yet. Your _native_ language is configurable and only affects how the drill explains things (see below); it never changes what the checker flags.
 
@@ -18,14 +18,15 @@ The checker never blocks your turn and never writes to the conversation: it runs
 
 ## Install
 
-In Claude Code, add this repository as a plugin marketplace, then install the plugin:
+In Claude Code, add this repository as a plugin marketplace, install the plugin, then wire the statusline:
 
 ```
 /plugin marketplace add butvinm/cc-grammar-coach
 /plugin install cc-grammar-coach@cc-grammar-coach
+/cc-grammar-coach:install-statusline
 ```
 
-`/plugin marketplace add` also accepts a full git URL or a local path to a clone. The `@cc-grammar-coach` suffix names the marketplace; if the plugin name is unambiguous, `/plugin install cc-grammar-coach` works too, and the interactive `/plugin` menu lets you pick it from a list.
+`/plugin marketplace add` also accepts a full git URL or a local path to a clone. The `@cc-grammar-coach` suffix names the marketplace; if the plugin name is unambiguous, `/plugin install cc-grammar-coach` works too, and the interactive `/plugin` menu lets you pick it from a list. However you install, the last step is the same: run `/cc-grammar-coach:install-statusline` once, or the checker will log mistakes without ever showing you anything (see [Statusline wiring](#statusline-wiring)).
 
 ### The configuration prompts
 
@@ -33,25 +34,29 @@ On install, Claude Code prompts you for the plugin's settings. Each maps to a `u
 
 - **Native language** (`native_language`) - your first language, e.g. `Russian`. The drill uses it to explain English rules by contrast with the habits your language creates (no articles, freer word order, aspect instead of tense, and so on). **No default:** leave it empty for generic, language-neutral lessons that assume no nationality. The checker ignores this field entirely.
 - **Suggest rephrasings** (`rephrase`, default **true**) - when on, the checker may add one `✨` line rewriting a clearly awkward message more naturally. Grammar flags appear regardless of this setting; only the extra rewrite is gated by it.
-- **Show statusline feedback** (`show_feedback`, default **true**) - when on, the checker writes feedback for the statusline to display. Turn it **off** to keep logging mistakes for the drill while seeing nothing on screen. Capture and display are independent: the drill works either way.
 - **LLM base URL** (`llm_base_url`) - the base URL of an OpenAI-compatible endpoint. The hook calls `<base-url>/chat/completions`, so include the version segment, e.g. `https://your-host/v1`. **Leave empty** to fall back to the local `claude -p` (haiku) CLI.
 - **LLM model** (`llm_model`, default **`openai/gpt-oss-120b`**) - the model identifier sent to that endpoint.
 - **LLM API key** (`llm_api_key`) - the bearer key for the endpoint. Marked **sensitive**: it is stored outside `settings.json` and injected into the hook's environment only. The endpoint path activates only when the base URL, model, and key are all set; otherwise the hook uses the haiku fallback.
 
 You can change any of these later from the `/plugin` menu.
 
-## Statusline wiring (manual, one time)
+## Statusline wiring
 
-The plugin **cannot** wire the grammar segment into your statusline for you. A statusline command runs outside the plugin sandbox and does not receive the plugin's environment variables, so it cannot locate the plugin or read its config on its own. Adding the segment is a manual, one-time edit to your own statusline script.
+A statusline command runs outside the plugin sandbox, so the plugin cannot inject the grammar segment silently; the wiring is a one-time step performed by the bundled command:
 
-The plugin ships two pieces for this under `statusline/`:
+```
+/cc-grammar-coach:install-statusline
+```
 
-- `render-grammar.sh` - defines `render_grammar`, which reads `$GRAMMAR_HOME/status/<session-id>` and prints the colored feedback segment. Source this from your existing statusline.
-- `grammar-statusline.sh` - a complete standalone statusline that parses the session id from stdin and calls `render_grammar` for you. Use it if you do not already have a statusline.
+It picks the right move for your setup, shows you every change before writing it, and is safe to re-run (it detects existing wiring and never appends twice):
 
-### Add the segment to your own statusline
+- **No statusline configured** - it points `statusLine` in `settings.json` at the bundled standalone statusline, which shows just the grammar segment.
+- **Existing statusline script** - it backs your script up and appends the grammar segment at the end, adapted to how your script reads stdin.
+- Either way, it first copies `render-grammar.sh` and `grammar-statusline.sh` to stable paths under `~/.claude/cc-grammar-coach/` and wires against those, not the versioned plugin cache. The hook keeps these copies fresh on every prompt, so plugin updates never require re-wiring.
 
-Claude Code passes each statusline command a JSON object on stdin that includes `session_id`. Read it, then source `render-grammar.sh` and call `render_grammar` with that id:
+### Manual wiring
+
+If you would rather edit your statusline yourself: Claude Code passes each statusline command a JSON object on stdin that includes `session_id`. Read it, then source the stable renderer copy and call `render_grammar` with that id:
 
 ```bash
 #!/bin/bash
@@ -61,26 +66,13 @@ input=$(cat)
 
 # grammar segment:
 SID=$(printf '%s' "$input" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("session_id") or "default")')
-. "$HOME/path/to/cc-grammar-coach/statusline/render-grammar.sh"
-render_grammar "$SID"
+if [ -f "$HOME/.claude/cc-grammar-coach/render-grammar.sh" ]; then
+    . "$HOME/.claude/cc-grammar-coach/render-grammar.sh"
+    render_grammar "$SID"
+fi
 ```
 
-`render_grammar` prints nothing when there is no feedback for the session, so it is safe to leave in place permanently.
-
-Point the `.` (source) line at wherever the plugin's files live. The installed copy sits under the versioned plugin cache (`~/.claude/plugins/cache/cc-grammar-coach/cc-grammar-coach/<version>/statusline/render-grammar.sh`); because that path changes when the plugin updates, wiring against a fixed clone of this repo is more durable if you plan to keep the segment long-term. `render-grammar.sh` depends only on `$GRAMMAR_HOME/status/<session-id>`, not on the plugin environment, so either source works.
-
-### Or use the standalone statusline
-
-If you have no statusline yet, point `settings.json` straight at the bundled one:
-
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "~/path/to/cc-grammar-coach/statusline/grammar-statusline.sh"
-  }
-}
-```
+`render_grammar` prints nothing when there is no feedback for the session, and the `-f` guard keeps your statusline safe if the plugin is uninstalled, so the segment is harmless to leave in place permanently.
 
 ## Configuration reference
 
@@ -88,7 +80,6 @@ If you have no statusline yet, point `settings.json` straight at the bundled one
 | ----------------- | ------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `native_language` | string             | _(none)_              | Drill uses it to explain English by contrast with your first language; empty means generic lessons. Not read by the checker. |
 | `rephrase`        | boolean            | `true`                | Allow the checker to append one `✨` natural-rewrite line for clearly awkward messages.                                      |
-| `show_feedback`   | boolean            | `true`                | Write checker feedback for the statusline. Off still logs mistakes for the drill.                                            |
 | `llm_base_url`    | string             | _(none)_              | OpenAI-compatible endpoint base URL; empty falls back to `claude -p` haiku.                                                  |
 | `llm_model`       | string             | `openai/gpt-oss-120b` | Model id sent to the endpoint.                                                                                               |
 | `llm_api_key`     | string (sensitive) | _(none)_              | Bearer key for the endpoint; stored outside `settings.json`.                                                                 |
@@ -99,18 +90,19 @@ There is no master on/off toggle: `/plugin disable cc-grammar-coach` turns the w
 
 All state lives under one directory, `~/.claude/cc-grammar-coach`, overridable by setting `$GRAMMAR_HOME`. A fresh install creates it lazily; each component makes the subdirectories it writes to. It holds:
 
-| Path                  | What it is                                                                                                             |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `status/<session-id>` | The current feedback line(s) for one session, read by the statusline. Files older than a day are tidied automatically. |
-| `history.jsonl`       | Append-only mistake log, one JSON object per non-clean message. The drill's data source.                               |
-| `drills/`             | Generated self-contained HTML lessons, one per drill.                                                                  |
-| `curriculum.tsv`      | Learn-mode progress: one `<iso-week>\t<topic-id>` line per week, enforcing one new syllabus topic per week.            |
+| Path                                         | What it is                                                                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `status/<session-id>`                        | The current feedback line(s) for one session, read by the statusline. Files older than a day are tidied automatically.         |
+| `history.jsonl`                              | Append-only mistake log, one JSON object per non-clean message. The drill's data source.                                       |
+| `drills/`                                    | Generated self-contained HTML lessons, one per drill.                                                                          |
+| `curriculum.tsv`                             | Learn-mode progress: one `<iso-week>\t<topic-id>` line per week, enforcing one new syllabus topic per week.                    |
+| `render-grammar.sh`, `grammar-statusline.sh` | Stable copies of the statusline scripts, refreshed by the hook whenever the plugin updates; the statusline wiring points here. |
 
 ## Usage
 
 ### The checker
 
-The checker runs on every message automatically once installed; there is nothing to invoke. It is **silent by default** and only reacts in the statusline (when `show_feedback` is on):
+The checker runs on every message automatically once installed; there is nothing to invoke. It is **silent by default** and only reacts in the statusline (once wired, see [Statusline wiring](#statusline-wiring)):
 
 - **Clean message** - one short compliment on a `✔` line, e.g. `✔ Looks good`. This is also the liveness signal, so it never renders blank.
 - **Grammar error** - one line per error, in the form `[<category>] <wrong> → <fix> (<rule>: <why>)`. Categories are the ones in `config/categories.txt`: `articles`, `agreement`, `tense`, `prepositions`, `plural`, `verb-form`, `questions`.
@@ -135,6 +127,10 @@ The skill has two modes. **Drill** (default) ranks your recent weak spots from `
 The default model is **`openai/gpt-oss-120b`**, chosen by measurement: it was silent on every typo and name/mention case, had the best recall, and returned in ~1.4s at the median. That ~1.4s is the model's raw p50; the shipped hook's end-to-end wall-clock (python subprocess spawns plus the round-trip to a remote endpoint) measured roughly **2-4s, median ~3s**, so feedback lands a few seconds after you send a message, not instantly. Because the call is backgrounded, none of that latency ever blocks your turn. See `eval/` for the harness and dataset behind the model choice.
 
 With **no API key configured**, the hook needs zero setup and falls back to `claude -p` with haiku. That path is slower and less strict about output format, but works offline of any custom endpoint. A **custom OpenAI-compatible endpoint** is opt-in: set the base URL, model, and key, and vet it with `eval/run.py` before trusting it.
+
+## Troubleshooting
+
+**No feedback in the statusline?** The display needs the one-time wiring: run `/cc-grammar-coach:install-statusline`. To check the pipeline yourself: the checker's raw output for a session lives in `~/.claude/cc-grammar-coach/status/<session-id>` (written a few seconds after each English message), and the mistake log in `~/.claude/cc-grammar-coach/history.jsonl`. Fresh files there mean the checker works and only the display is unwired; no files there mean the hook itself is not running (is the plugin enabled?). Capture works even while the display is unwired, so no history is lost either way - and you can always just describe the symptom to Claude and let it walk this chain for you.
 
 ## License
 

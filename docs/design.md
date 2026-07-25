@@ -8,8 +8,8 @@ Where a decision was measured, `requirements.md` holds the evidence and this doc
 
 Three runtime components plus a maintainer tool:
 
-- **Checker** - a `UserPromptSubmit` hook (bash) that calls the model out of band, captures mistakes to a log, and optionally writes feedback for the statusline.
-- **Statusline render** - a shell wrapper plus a sourceable function that renders the checker's feedback. Not installable by the plugin (see section 5); the user wires it in.
+- **Checker** - a `UserPromptSubmit` hook (bash) that calls the model out of band, captures mistakes to a log, and writes feedback for the statusline.
+- **Statusline render** - a shell wrapper plus a sourceable function that renders the checker's feedback. Not injectable by the plugin silently (see section 6); wired by the `/cc-grammar-coach:install-statusline` command.
 - **Drill** - a skill that turns the log into a lesson-plus-quiz web page.
 - **Eval** - a maintainer harness plus dataset; in the repo, not part of the installed runtime.
 
@@ -23,6 +23,8 @@ cc-grammar-coach/                    # repo root, plugin name = cc-grammar-coach
   hooks/
     hooks.json                          # declares the UserPromptSubmit hook + timeout
     grammar-check.sh                    # the checker (rewritten)
+  commands/
+    install-statusline.md               # one-time statusline wiring, agent-performed
   skills/grammar-drill/
     SKILL.md                            # uses ${user_config.*} and ${CLAUDE_PLUGIN_ROOT}
     scripts/build_drill.py
@@ -56,7 +58,6 @@ Each component reads it by its own idiomatic channel:
 | ----------------- | ----------------------------------- | -------------- | --------------------------------------- |
 | `native_language` | string, no default                  | env            | inline `${user_config.native_language}` |
 | `rephrase`        | boolean, default true               | env            | not needed                              |
-| `show_feedback`   | boolean, default true               | env            | not needed                              |
 | `llm_base_url`    | string                              | env            | not needed                              |
 | `llm_model`       | string, default openai/gpt-oss-120b | env            | not needed                              |
 | `llm_api_key`     | string, sensitive                   | env (verified) | not needed                              |
@@ -68,12 +69,11 @@ Each component reads it by its own idiomatic channel:
 
 ### Toggles
 
-Only two, both semantically distinct:
+Only one: `rephrase` - the naturalness-channel off-switch (section 3.3 of requirements).
 
-- `show_feedback` - the capture-vs-display split (Persona B runs capture with display off).
-- `rephrase` - the naturalness-channel off-switch (section 3.3 of requirements).
+There is no `show_feedback` display toggle. It shipped in 0.1.0 and was removed: a config flag titled "Show statusline feedback" promised something the plugin cannot deliver alone (display also needs the statusline wiring), so enabling it and seeing nothing was the plugin's first real-use failure. Display is now controlled by exactly one thing - whether the statusline is wired (the install-statusline command) - and the hook always writes status files; the capture-vs-display split survives as "wired or not" instead of a flag. Persona B (capture only, no display) simply does not run the command.
 
-There is no master enable toggle: `/plugin disable cc-grammar-coach` removes the hook, which is the same thing.
+There is no master enable toggle either: `/plugin disable cc-grammar-coach` removes the hook, which is the same thing.
 
 ## 5. Checker hook flow (rewritten, ~90 lines vs 332)
 
@@ -86,7 +86,7 @@ There is no master enable toggle: `/plugin disable cc-grammar-coach` removes the
    b. Call the model: API path (curl plus python3 for JSON) when credentials are present, else `claude -p` haiku under the recursion guard.
    c. Light sanitation only: strip `**` and backticks, drop blank lines. No filters.
    d. Capture: if the result carries any fix or rephrase, append one JSONL line to `history.jsonl`.
-   e. Display: only when `show_feedback=on`, write `status/<sid>`, with the praise-liveness fallback on the clean case.
+   e. Display: always write `status/<sid>`, with the praise-liveness fallback on the clean case. Whether anything shows is decided solely by the statusline wiring (section 6).
 6. Timestamps also move to python3, removing `date -d`. The only remaining platform branch is the drill's page opener (`open` vs `xdg-open`), detected at use.
 
 Categories: `config/categories.txt` ships the English list in the plugin root and the hook reads only that. The grammar-home override is dropped with the target knob (v2 concern). Membership stays deferred (requirements section 3.5).
@@ -95,7 +95,8 @@ Categories: `config/categories.txt` ships the English list in the plugin root an
 
 - `statusline/render-grammar.sh` defines `render_grammar()`: it reads `$GRAMMAR_HOME/status/$SID` and prints the feedback, colored by marker (`✔`/`✨` green, `[category]` fix split into parts and colored), soft-wrapped to terminal width. This is the current statusline's grammar block, lifted out and parameterized by `$GRAMMAR_HOME`.
 - `statusline/grammar-statusline.sh` is a minimal standalone statusline that sources the function and calls it, for users who have none.
-- Install is the one unavoidable manual step (a plugin cannot set `statusLine`): either point `statusLine.command` at `grammar-statusline.sh`, or source `render-grammar.sh` in an existing statusline and call `render_grammar`. Documented in the README.
+- A plugin cannot set `statusLine` silently, so wiring is a one-time explicit step - but performed by the agent, not by hand: `/cc-grammar-coach:install-statusline` (last line of the README install block) points `statusLine.command` at the standalone script when none is configured, or appends the `render_grammar` snippet to an existing statusline script (backup, idempotent, verified end to end with a test status file). Manual wiring stays documented in the README as the advanced path.
+- The wiring references stable copies of both scripts in `$GRAMMAR_HOME`, not the versioned plugin cache path (which changes every release); the hook refreshes those copies on every prompt via `cmp`, so plugin updates propagate to the statusline without re-wiring.
 - The statusline needs no config and no plugin env; it only needs the fixed status path.
 
 ## 7. Drill
@@ -109,7 +110,7 @@ Categories: `config/categories.txt` ships the English list in the plugin root an
 
 - `plugin.json`: `name` cc-grammar-coach, plus version, description, author, homepage, repository, license, keywords, the `userConfig` block (section 4), and the hooks pointer.
 - `hooks/hooks.json`: one `UserPromptSubmit` entry running `${CLAUDE_PLUGIN_ROOT}/hooks/grammar-check.sh` with a short timeout. The hook backgrounds the model call and returns immediately with empty stdout, so its synchronous part is fast and a ~10s timeout is ample.
-- `.claude-plugin/marketplace.json`: lists this one plugin from this repo, so `/plugin marketplace add <owner>/cc-grammar-coach` then `/plugin install` works, followed by the interactive userConfig prompts and the one manual statusline step.
+- `.claude-plugin/marketplace.json`: lists this one plugin from this repo, so `/plugin marketplace add <owner>/cc-grammar-coach` then `/plugin install` works, followed by the interactive userConfig prompts and the `/cc-grammar-coach:install-statusline` wiring step.
 
 ## 9. Reuse vs rewrite, and migration
 

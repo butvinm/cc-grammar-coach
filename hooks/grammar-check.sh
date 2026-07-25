@@ -16,11 +16,17 @@ STATUS_DIR="$GRAMMAR_HOME/status"
 HISTORY_FILE="$GRAMMAR_HOME/history.jsonl"
 mkdir -p "$STATUS_DIR"
 
+# Keep stable copies of the statusline scripts in GRAMMAR_HOME. The statusline runs outside the plugin sandbox and the versioned plugin-cache path changes on every update, so the wiring installed by /cc-grammar-coach:install-statusline points here instead and plugin updates propagate without re-wiring.
+for _f in render-grammar.sh grammar-statusline.sh; do
+  if ! cmp -s "$PLUGIN_ROOT/statusline/$_f" "$GRAMMAR_HOME/$_f" 2>/dev/null; then
+    cp "$PLUGIN_ROOT/statusline/$_f" "$GRAMMAR_HOME/$_f" && chmod +x "$GRAMMAR_HOME/$_f"
+  fi
+done
+
 MIN_CHARS=15
 MAX_CHARS=500
 
 REPHRASE="${CLAUDE_PLUGIN_OPTION_REPHRASE:-true}"
-SHOW_FEEDBACK="${CLAUDE_PLUGIN_OPTION_SHOW_FEEDBACK:-true}"
 LLM_BASE_URL="${CLAUDE_PLUGIN_OPTION_LLM_BASE_URL:-}"
 LLM_MODEL="${CLAUDE_PLUGIN_OPTION_LLM_MODEL:-openai/gpt-oss-120b}"
 LLM_API_KEY="${CLAUDE_PLUGIN_OPTION_LLM_API_KEY:-}"
@@ -112,12 +118,11 @@ except Exception:
     FEEDBACK=$(printf 'Text: %s' "$PROMPT" | claude -p --model claude-haiku-4-5-20251001 "$PROMPT_SYS" 2>/dev/null)
   fi
 
-  JLINE=$(FB="$FEEDBACK" MSG="$PROMPT" SHOW="$SHOW_FEEDBACK" STATUS="$STATUS_FILE" python3 -c '
+  JLINE=$(FB="$FEEDBACK" MSG="$PROMPT" STATUS="$STATUS_FILE" python3 -c '
 import os, sys, re, json, datetime
 
 fb = os.environ.get("FB", "")
 msg = os.environ.get("MSG", "")
-show = os.environ.get("SHOW", "true") != "false"
 status_path = os.environ["STATUS"]
 
 lines = []
@@ -152,17 +157,16 @@ if has_content:
         obj["rephrase"] = rephrase
     sys.stdout.write(json.dumps(obj, ensure_ascii=False))
 
-if show:
-    if has_content:
-        parts = list(fix_lines)
-        if rephrase:
-            parts.append("✨ " + rephrase)
-        open(status_path, "w", encoding="utf-8").write("\n".join(parts))
-    else:
-        compliment = praise[praise.find("✔") + 1:].strip() if praise else ""
-        if not compliment or len(compliment) > 50 or len(lines) > 1:
-            compliment = "Looks good"
-        open(status_path, "w", encoding="utf-8").write("✔ " + compliment)
+if has_content:
+    parts = list(fix_lines)
+    if rephrase:
+        parts.append("✨ " + rephrase)
+    open(status_path, "w", encoding="utf-8").write("\n".join(parts))
+else:
+    compliment = praise[praise.find("✔") + 1:].strip() if praise else ""
+    if not compliment or len(compliment) > 50 or len(lines) > 1:
+        compliment = "Looks good"
+    open(status_path, "w", encoding="utf-8").write("✔ " + compliment)
 ')
   [ -n "$JLINE" ] && printf '%s\n' "$JLINE" >> "$HISTORY_FILE"
 ) > /dev/null 2>&1 &

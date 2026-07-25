@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "cc-grammar-coach",
-  "version": "0.1.0",
-  "description": "Out-of-band English grammar checker (UserPromptSubmit hook) that logs your mistakes and shows optional statusline feedback, plus a drill skill that turns the log into a lesson-and-quiz web page.",
+  "version": "0.2.0",
+  "description": "Out-of-band English grammar checker (UserPromptSubmit hook) that logs your mistakes and shows statusline feedback, plus a drill skill that turns the log into a lesson-and-quiz web page. After installing, run /cc-grammar-coach:install-statusline once to wire the feedback into your statusline.",
   "author": {
     "name": "Mikhail Butvin"
   },
@@ -20,12 +20,6 @@
       "type": "boolean",
       "title": "Suggest rephrasings",
       "description": "When enabled, the checker may append a single more-natural rewrite of the whole message when it is clearly awkward. Grammar flags are shown regardless of this setting.",
-      "default": true
-    },
-    "show_feedback": {
-      "type": "boolean",
-      "title": "Show statusline feedback",
-      "description": "When enabled, checker feedback is written for the statusline to display. Disable to keep logging mistakes for the drill without any on-screen feedback.",
       "default": true
     },
     "llm_base_url": {
