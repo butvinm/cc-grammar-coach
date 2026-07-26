@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "cc-grammar-coach",
-  "version": "0.3.0",
-  "description": "Out-of-band English grammar checker (UserPromptSubmit hook) that logs your mistakes and shows statusline feedback, plus a drill skill that turns the log into a lesson-and-quiz web page. After installing, run /cc-grammar-coach:install-statusline once to wire the feedback into your statusline.",
+  "version": "0.4.0",
+  "description": "Out-of-band English grammar checker (UserPromptSubmit hook) that logs your mistakes and shows statusline feedback, plus drill and learn skills that turn the log into lesson-and-quiz web pages. After installing, run /cc-grammar-coach:install-statusline once to wire the feedback into your statusline.",
   "author": {
     "name": "Mikhail Butvin"
   },
@@ -14,7 +14,7 @@
     "native_language": {
       "type": "string",
       "title": "Native language",
-      "description": "Your native language, used by the drill skill to explain English grammar with contrasts you will recognize. Leave empty for generic, language-neutral lessons."
+      "description": "Your native language, used by the drill and learn skills to explain English grammar with contrasts you will recognize. Leave empty for generic, language-neutral lessons."
     },
     "rephrase": {
       "type": "boolean",

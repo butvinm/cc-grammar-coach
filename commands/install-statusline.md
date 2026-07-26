@@ -48,5 +48,5 @@ Follow these steps:
    - Backup: <path, or "none">
    - Verification: <passed | FAILED: reason>
 
-   Feedback appears a few seconds after each English message you send. Raw feedback lives in ~/.claude/cc-grammar-coach/status/<session-id>; the mistake log for /cc-grammar-coach:grammar-drill is ~/.claude/cc-grammar-coach/history.jsonl.
+   Feedback appears a few seconds after each English message you send. Raw feedback lives in ~/.claude/cc-grammar-coach/status/<session-id>; the mistake log for /cc-grammar-coach:drill is ~/.claude/cc-grammar-coach/history.jsonl.
    ```

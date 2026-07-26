@@ -3,7 +3,7 @@
 An English grammar coach for Claude Code, in two parts:
 
 - a **checker** hook that reviews every English message you send, out of band, logs the mistakes it finds, and shows short feedback in your statusline;
-- a **drill** skill that turns those logged mistakes into a personalized lesson-and-quiz web page.
+- **drill** and **learn** skills that turn that log into personalized lesson-and-quiz web pages: drill practices your logged mistakes, learn teaches the next topic from a weekly syllabus.
 
 ## The checker
 
@@ -15,15 +15,16 @@ The checker runs on every message automatically: it reviews the message, appends
 - `<wrong> → <fix> (<rule>: <why>)` - one line per grammar error.
 - `✨ <rephrase>` - optionally, a more natural rephrasing of a clearly awkward message; the `rephrase` setting turns this line off.
 
-## The drill
+## Drill and learn
 
-Ask for a drill in plain language ("give me a grammar drill", "quiz me on my mistakes", "let's learn a new grammar topic"), or invoke the skill explicitly:
+Ask in plain language ("give me a grammar drill", "quiz me on my mistakes", "let's learn a new grammar topic"), or invoke the skills explicitly:
 
 ```
-/cc-grammar-coach:grammar-drill
+/cc-grammar-coach:drill
+/cc-grammar-coach:learn
 ```
 
-**Drill** mode (default) ranks your recent weak spots from the mistake log and builds a lesson plus quiz per topic, drawn from your own logged mistakes. **Learn** mode teaches the next new topic from the weekly syllabus, one per week. Either way you get a self-contained HTML page that grades your answers in the browser offline, explaining each answer by contrast with your native language when one is configured.
+**Drill** ranks your recent weak spots from the mistake log and builds a lesson plus quiz per topic, drawn from your own logged mistakes. **Learn** teaches the next new topic from the weekly syllabus, one per week. Either way you get a self-contained HTML page that grades your answers in the browser offline, explaining each answer by contrast with your native language when one is configured.
 
 <p align="center">
   <img src="docs/img/quiz-correct.png" width="49%" alt="A choice question answered correctly, with the rule explained">
@@ -54,7 +55,7 @@ On install, Claude Code prompts you for these settings; change them later from t
 
 | Field             | Type               | Default               | Meaning                                                                                                                                       |
 | ----------------- | ------------------ | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `native_language` | string             | _(none)_              | Drill uses it to explain English by contrast with your first language; empty means generic lessons. Not read by the checker.                  |
+| `native_language` | string             | _(none)_              | Drill and learn use it to explain English by contrast with your first language; empty means generic lessons. Not read by the checker.         |
 | `rephrase`        | boolean            | `true`                | Allow the checker to append one `✨` rephrase line for clearly awkward messages.                                                              |
 | `llm_base_url`    | string             | _(none)_              | OpenAI-compatible endpoint base URL including the version segment, e.g. `https://your-host/v1`; required, the checker is inactive without it. |
 | `llm_model`       | string             | `openai/gpt-oss-120b` | Model id sent to the endpoint.                                                                                                                |
