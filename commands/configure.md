@@ -1,6 +1,13 @@
 ---
-description: Wire grammar feedback into your statusline (one-time; idempotent)
+description: Configure cc-grammar-coach; subcommand install-statusline wires grammar feedback into your statusline (one-time; idempotent)
+argument-hint: install-statusline
 ---
+
+Requested subcommand: $ARGUMENTS
+
+If the subcommand is not exactly `install-statusline`, reply with the supported usage, `/cc-grammar-coach:configure install-statusline` (wire grammar feedback into your statusline), and stop.
+
+# install-statusline
 
 Wire the cc-grammar-coach feedback segment into the user's Claude Code statusline. Work against the stable copies in `$GRAMMAR_HOME` (default `~/.claude/cc-grammar-coach`), never against the versioned plugin cache path: the cache path changes on every plugin update, while the hook refreshes the `GRAMMAR_HOME` copies automatically, so wiring done here survives updates.
 

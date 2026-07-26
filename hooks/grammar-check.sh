@@ -14,7 +14,7 @@ STATUS_DIR="$GRAMMAR_HOME/status"
 HISTORY_FILE="$GRAMMAR_HOME/history.jsonl"
 mkdir -p "$STATUS_DIR"
 
-# Keep stable copies of the statusline scripts in GRAMMAR_HOME. The statusline runs outside the plugin sandbox and the versioned plugin-cache path changes on every update, so the wiring installed by /cc-grammar-coach:install-statusline points here instead and plugin updates propagate without re-wiring.
+# Keep stable copies of the statusline scripts in GRAMMAR_HOME. The statusline runs outside the plugin sandbox and the versioned plugin-cache path changes on every update, so the wiring installed by /cc-grammar-coach:configure install-statusline points here instead and plugin updates propagate without re-wiring.
 for _f in render-grammar.sh grammar-statusline.sh; do
   if ! cmp -s "$PLUGIN_ROOT/statusline/$_f" "$GRAMMAR_HOME/$_f" 2>/dev/null; then
     cp "$PLUGIN_ROOT/statusline/$_f" "$GRAMMAR_HOME/$_f" && chmod +x "$GRAMMAR_HOME/$_f"

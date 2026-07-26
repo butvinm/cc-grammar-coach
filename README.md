@@ -44,10 +44,10 @@ In Claude Code, add this repository as a plugin marketplace, install the plugin,
 ```
 /plugin marketplace add butvinm/cc-grammar-coach
 /plugin install cc-grammar-coach@cc-grammar-coach
-/cc-grammar-coach:install-statusline
+/cc-grammar-coach:configure install-statusline
 ```
 
-`/cc-grammar-coach:install-statusline` proposes either configuring a new statusline or integrating the grammar segment into your existing one; details and manual wiring: [docs/statusline.md](docs/statusline.md).
+`/cc-grammar-coach:configure install-statusline` proposes either configuring a new statusline or integrating the grammar segment into your existing one; details and manual wiring: [docs/statusline.md](docs/statusline.md).
 
 ## Configuration
 

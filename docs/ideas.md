@@ -57,6 +57,6 @@
 
 - add a guide how to configure Gemini free
 
-- `/cc-grammar-coach:install-statusline` consumes space, better option is "/cc-grammar-coach [install-statusline | uninstall-statusline | doctor | ...]"
+- "/cc-grammar-coach:configure [install-statusline | uninstall-statusline | doctor | ...]"; uninstall-statusline and doctor subcommands are still open
 
 - (implemented) drill and learn are mixed under the same skill, but they are different flows (practice your logged mistakes vs teach the next weekly syllabus topic). consider splitting them

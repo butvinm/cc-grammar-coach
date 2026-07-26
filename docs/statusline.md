@@ -3,7 +3,7 @@
 The checker shows its feedback through the Claude Code statusline. A statusline command runs outside the plugin sandbox and `statusLine` is a single user setting, so the plugin cannot inject the grammar segment silently; wiring is a one-time step performed by the bundled command:
 
 ```
-/cc-grammar-coach:install-statusline
+/cc-grammar-coach:configure install-statusline
 ```
 
 It either points `statusLine` at the bundled standalone statusline (when none is configured) or backs up your existing script and appends the grammar segment to it; every change is shown before writing, and re-running never appends twice.
