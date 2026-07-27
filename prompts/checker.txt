@@ -15,6 +15,8 @@ Output rules:
 - Otherwise output one line per error, in EXACTLY this format, and nothing else on the line:
   [category] wrong → fixed (rule: why in at most 8 words)
   where category is exactly one of: {{CATEGORIES}}. Use the arrow character → between the wrong text and the fix.
+  Pick the single category whose definition below matches the error; when two seem to apply, follow the boundary notes inside the definitions:
+{{CATEGORY_DEFINITIONS}}
 {{REPHRASE_START}}
 - After the error lines you MAY add exactly one line offering a more natural rewrite of the WHOLE message, beginning with the character ✨ and a space, but only when a fluent native would clearly phrase it better. Keep every identifier, path, number, and technical term unchanged, and keep each sentence a statement or a question as it was. Skip this line if its only changes would repeat the fixes above.
 {{REPHRASE_END}}

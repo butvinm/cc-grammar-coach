@@ -70,6 +70,10 @@ Use it two ways: `fixes[].category` ranks recent weak spots, and a line's presen
 
    Pick the top 2-3 categories from that ordering. Skip typo/spelling categories and any non-grammar category (for example `other`) - they are not grammar topics. If two categories tie on count, the earlier-printed one ranks first (the counter breaks ties by first appearance).
 
+   Two slug-handling rules before picking:
+   - Entries logged before the taxonomy split may carry the legacy slug `verb-form`. Never drill `verb-form` as a topic: read those entries' `wrong`/`fix` pairs, reassign each fix to the fine slug whose definition in `${CLAUDE_PLUGIN_ROOT}/config/categories.txt` matches it, fold the reassigned counts into the ranking, and only then pick.
+   - When several `verb-*` slugs rank high but none alone has at least 3 fixes in the window, merge the closest siblings into one topic instead of teaching a thin lesson per slug.
+
 2. Pull the lesson material for the chosen categories. Read `$GRAMMAR_HOME/history.jsonl` again and collect, per chosen category, the `wrong`/`fix` pairs and the surrounding `message` from lines whose `fixes[]` include that category. Skip messages that read as deliberate mistake-planting to test the checker (long unnatural strings of stacked errors). These are the pool for lesson examples.
 
 3. Build the drill data. Read `${CLAUDE_PLUGIN_ROOT}/skills/drill/references/authoring.md` for the data schema and question-writing rules, then author:

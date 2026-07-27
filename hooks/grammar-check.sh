@@ -70,7 +70,8 @@ import os
 root = os.environ["PLUGIN_ROOT"]
 keep = os.environ.get("REPHRASE", "true") != "false"
 tmpl = open(os.path.join(root, "prompts", "checker.txt"), encoding="utf-8").read()
-cats = [l.strip() for l in open(os.path.join(root, "config", "categories.txt"), encoding="utf-8") if l.strip()]
+entries = [l.strip() for l in open(os.path.join(root, "config", "categories.txt"), encoding="utf-8") if l.strip()]
+slugs = [e.split(":", 1)[0].strip() for e in entries]
 out, in_block = [], False
 for line in tmpl.split("\n"):
     if line.strip() == "{{REPHRASE_START}}":
@@ -83,7 +84,9 @@ for line in tmpl.split("\n"):
         continue
     out.append(line)
 import sys
-sys.stdout.write("\n".join(out).replace("{{CATEGORIES}}", ", ".join(cats)))
+sys.stdout.write("\n".join(out)
+    .replace("{{CATEGORIES}}", ", ".join(slugs))
+    .replace("{{CATEGORY_DEFINITIONS}}", "\n".join("  - " + e for e in entries)))
 ')
 
   PAYLOAD=$(MODEL="$LLM_MODEL" SYS="$PROMPT_SYS" USR="$PROMPT" python3 -c '

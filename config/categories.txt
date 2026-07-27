@@ -1,7 +1,11 @@
-articles
-agreement
-tense
-prepositions
-plural
-verb-form
-questions
+articles: a/an/the is missing, unnecessary, or wrong - "I want to create skill" → "I want to create a skill"
+agreement: the verb does not match its subject in number or person - "the list of issues are growing" → "the list of issues is growing"
+tense: a well-formed verb places the action at the wrong time - "Yesterday I write three tests" → "Yesterday I wrote three tests"; a bad form after do/does/did, a modal, or have is verb-after-auxiliary, not tense
+prepositions: a preposition is wrong, missing, or extra - "it depends of the input" → "it depends on the input"
+plural: a noun carries the wrong number - "I reviewed three paper" → "I reviewed three papers"
+questions: a question lacks do-support or subject-auxiliary inversion - "How we can improve it?" → "How can we improve it?"; a wrong verb form after a correctly placed auxiliary is verb-after-auxiliary, not questions
+verb-after-auxiliary: the right verb in the wrong inflection after do/does/did, a modal, or have/be - "I did not understood" → "I did not understand", "does it returns" → "does it return"
+verb-gerund-infinitive: a gerund stands where an infinitive belongs or the reverse, including the gerund required after a preposition - "before commit the change" → "before committing the change", "suggest to install" → "suggest installing"
+verb-participle: a participle or adjectival verb form is wrong - "the rules define in the config" → "the rules defined in the config", "a relate issue" → "a related issue"
+verb-missing: a required verb or auxiliary is absent, or an extra one appears - "this file referenced in the config" → "this file is referenced in the config", "the problem when deploying" → "the problem occurs when deploying"
+word-form: a noun or adjective stands where a verb belongs, or the reverse; the root is right but the part of speech is wrong - "we should choice a simpler name" → "we should choose a simpler name", "can you provider an example" → "can you provide an example"
