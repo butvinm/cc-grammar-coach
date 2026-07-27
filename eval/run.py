@@ -46,11 +46,18 @@ def norm_words(text):
     return re.findall(r"[a-z0-9']+", text.lower())
 
 
-def rephrase_similarity(message, fixes, rephrase):
+def apply_fixes(message, fixes):
     corrected = message
     for f in fixes:
-        corrected = corrected.replace(f.get("wrong", ""), f.get("fix", ""), 1)
-    return difflib.SequenceMatcher(None, norm_words(corrected), norm_words(rephrase)).ratio()
+        wrong = f.get("wrong", "")
+        if not wrong:
+            continue
+        corrected = re.sub(r"(?<!\w)" + re.escape(wrong) + r"(?!\w)", lambda m, _f=f: _f.get("fix", ""), corrected, count=1)
+    return corrected
+
+
+def rephrase_similarity(message, fixes, rephrase):
+    return difflib.SequenceMatcher(None, norm_words(apply_fixes(message, fixes)), norm_words(rephrase)).ratio()
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN_ROOT = os.path.dirname(HERE)
@@ -279,6 +286,9 @@ def run_selftest():
         return 2
     if rephrase_similarity("yesterday I fix bug", [{"wrong": "fix", "fix": "fixed"}], "The bug got fixed yesterday, finally.") >= DUP_RATIO:
         print("SELFTEST BROKEN: a restructured rephrase scored above DUP_RATIO")
+        return 2
+    if apply_fixes("I tried your script this morning and is working fine", [{"wrong": "is", "fix": "it is"}]) != "I tried your script this morning and it is working fine":
+        print("SELFTEST BROKEN: fix application must substitute whole words, not substrings")
         return 2
     print("SELFTEST OK: gate returned failure as expected; exiting non-zero")
     return 1

@@ -177,11 +177,11 @@ for l in lines:
     elif "✔" in l:
         praise = l
 
-# Drop a ✨ line that only repeats the corrections: apply the reported fixes to the message and compare word sequences, ignoring case and punctuation. The 0.9 similarity ceiling (not exact match) also catches rephrases where the model folded in a small fix it never reported; a genuine rewrite changes order or vocabulary and lands far below it. Threshold and normalization are mirrored in eval/run.py - keep them in sync.
+# Drop a ✨ line that only repeats the corrections: apply the reported fixes to the message and compare word sequences, ignoring case and punctuation. Fixes substitute on word boundaries, not raw substrings - a reported wrong of "is" must hit the standalone word, never the tail of "this". The 0.9 similarity ceiling (not exact match) also catches rephrases where the model folded in a small fix it never reported; a genuine rewrite changes order or vocabulary and lands far below it. Threshold and normalization are mirrored in eval/run.py - keep them in sync.
 if rephrase is not None:
     corrected = msg
     for f in fixes:
-        corrected = corrected.replace(f["wrong"], f["fix"], 1)
+        corrected = re.sub(r"(?<!\w)" + re.escape(f["wrong"]) + r"(?!\w)", lambda m, _f=f: _f["fix"], corrected, count=1)
     a = re.findall(r"[a-z0-9\x27]+", corrected.lower())
     b = re.findall(r"[a-z0-9\x27]+", rephrase.lower())
     if difflib.SequenceMatcher(None, a, b).ratio() >= 0.9:
