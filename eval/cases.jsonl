@@ -47,3 +47,9 @@
 {"id": "rc-par1", "source": "synthetic", "class": "recall", "category": "particles", "selection": "full", "message": "I will look the exact syntax in the docs and get back to you in a few minutes"}
 {"id": "rc-pos1", "source": "synthetic", "class": "recall", "category": "possessives", "selection": "full", "message": "I think my colleagues laptop is faster than mine because his build takes half the time"}
 {"id": "rc-pun1", "source": "synthetic", "class": "recall", "category": "punctuation", "selection": "full", "message": "I restarted the server twice it still returns the same error on every single request"}
+{"id": "rr01", "source": "real", "class": "rephrase-recall", "message": "It is needed to say that the results of the testing of the performance of this endpoint are not very good"}
+{"id": "rr02", "source": "real", "class": "rephrase-recall", "message": "The problem is that we have no possibility to test it on the production server"}
+{"id": "rr03", "source": "real", "class": "rephrase-recall", "message": "We with my colleague think this feature is not so actual now"}
+{"id": "nt01", "source": "real", "class": "natural-silent", "message": "Looks good to me, let me check the logs and get back to you tomorrow"}
+{"id": "nt02", "source": "real", "class": "natural-silent", "message": "I reviewed the PR and left two comments, everything else looks fine"}
+{"id": "nt03", "source": "synthetic", "class": "natural-silent", "message": "Can you take a look at the failing test when you have some time today"}

@@ -8,6 +8,9 @@ Scoring is per class and never pooled:
   - name/mention-silent false-positive rate (identifiers/paths/quoted mentions must stay silent)
   - recall (per grammar category) whether a known error is flagged, and whether it is flagged with the expected category
   - rephrase-dup       every rephrase logged to history.jsonl must differ structurally from the message with the fixes applied; a near-duplicate means the hook-side filter regressed (issue #9), so the ceiling is zero
+  - rephrase-recall    an awkward but grammatically correct message must receive a standalone rephrase (issue #21); gated by a floor on the rate of samples carrying one
+  - natural-silent     a clean, natural message must receive praise only - no fixes AND no rephrase; scored as a false-positive rate over both signals
+  - silent-rephrase    the typo/name silence classes must not acquire rephrases now that the model may rephrase without error lines; their rephrase rate has its own ceiling
 
 Exit code is non-zero when any gate fails (silence classes must stay under a false-positive-rate ceiling; recall must clear a flagged-any floor and a pooled exact-category floor), so CI and the plan's Task 8 can gate.
 
@@ -75,6 +78,9 @@ MIN_RECALL = float(os.environ.get("GRAMMAR_EVAL_MIN_RECALL", "0.7"))
 MAX_SILENT_FP_RATE = float(os.environ.get("GRAMMAR_EVAL_MAX_SILENT_FP_RATE", "0.25"))
 # Exact-category recall floor: the fraction of recall samples flagged with their OWN category slug, pooled across all categories. This is the gate against a model that catches every error but files them all under one wrong slug (which would still score 100% on the flagged-any floor below). It is pooled, not per-category, because each category has only 1-3 cases, so a single category can score zero exact hits on one sample by chance and a strict per-category zero-fail would be flaky. The slug definitions in config/categories.txt (issue #3) removed the worst naming overlap (the old catch-all verb-form), but pooling is about per-category sample size, not taxonomy quality, so it stays. Pooling separates a healthy model (~0.9 exact) from mislabel-everything (~0.1) with wide margin; the floor was raised from 0.5 to 0.6 after a --repeats 2 run of gpt-oss-120b on the defined slugs misfiled zero of its 41 flagged samples (exact rate = flagged rate = 93%).
 MIN_EXACT_RECALL = float(os.environ.get("GRAMMAR_EVAL_MIN_EXACT_RECALL", "0.6"))
+# Standalone-rephrase floor (issue #21): live sampling of gpt-oss-120b on the three fixture patterns landed 5/6 to 6/6, but each pattern rides on model mood, so the floor starts permissive; raise it once more fixtures accumulate.
+MIN_REPHRASE_RECALL = float(os.environ.get("GRAMMAR_EVAL_MIN_REPHRASE_RECALL", "0.5"))
+MAX_SILENT_REPHRASE_RATE = float(os.environ.get("GRAMMAR_EVAL_MAX_SILENT_REPHRASE_RATE", "0.25"))
 
 
 def forward_creds(env):
@@ -170,6 +176,8 @@ def evaluate(results):
     typo = [r for r in results if r["case"]["class"] == "typo-silent"]
     name = [r for r in results if r["case"]["class"] == "name-silent"]
     recall = [r for r in results if r["case"]["class"] == "recall"]
+    natural = [r for r in results if r["case"]["class"] == "natural-silent"]
+    reph_recall = [r for r in results if r["case"]["class"] == "rephrase-recall"]
 
     lines = []
     ok = True
@@ -195,6 +203,22 @@ def evaluate(results):
     lines.append("")
     lines.append("NAME/MENTION-SILENT (identifiers, paths, quoted mentions stay silent)")
     silence_block("name/mention-silent", name)
+    lines.append("")
+
+    lines.append("NATURAL-SILENT (a clean natural message gets praise only - no fixes, no rephrase)")
+    nat_samples = sum(r["runs"] for r in natural)
+    nat_noisy = sum(r.get("noisy_count", 0) for r in natural)
+    nat_rate = nat_noisy / nat_samples if nat_samples else 0.0
+    lines.append("  natural-silent         FP %d/%d samples  (%.0f%%, ceiling %.0f%%)"
+                 % (nat_noisy, nat_samples, nat_rate * 100, MAX_SILENT_FP_RATE * 100))
+    for r in natural:
+        if r.get("noisy_count"):
+            lines.append("      FP  %-8s [%d/%d runs] %s"
+                         % (r["case"]["id"], r["noisy_count"], r["runs"], r["case"]["message"]))
+    if nat_rate > MAX_SILENT_FP_RATE:
+        ok = False
+        lines.append("      -> FAIL: natural-silent noise rate %.0f%% exceeds ceiling %.0f%%"
+                     % (nat_rate * 100, MAX_SILENT_FP_RATE * 100))
     lines.append("")
 
     lines.append("RECALL (a known grammar error must be flagged, with its category)")
@@ -245,6 +269,36 @@ def evaluate(results):
         ok = False
         lines.append("      -> FAIL: a rephrase that only repeats the corrections escaped the hook filter")
 
+    rr_samples = sum(r["runs"] for r in reph_recall)
+    rr_hits = sum(r.get("rephrase_count", 0) for r in reph_recall)
+    rr_rate = rr_hits / rr_samples if rr_samples else 1.0
+    lines.append("  rephrase-recall        rephrased %d/%d samples  (%.0f%%, floor %.0f%%)"
+                 % (rr_hits, rr_samples, rr_rate * 100, MIN_REPHRASE_RECALL * 100))
+    for r in reph_recall:
+        missed = r["runs"] - r.get("rephrase_count", 0)
+        if missed:
+            lines.append("      MISS %-8s [%d/%d runs] %s"
+                         % (r["case"]["id"], missed, r["runs"], r["case"]["message"]))
+    if rr_rate < MIN_REPHRASE_RECALL:
+        ok = False
+        lines.append("      -> FAIL: standalone-rephrase recall %.0f%% below floor %.0f%% (awkward but correct messages are being praised)"
+                     % (rr_rate * 100, MIN_REPHRASE_RECALL * 100))
+
+    sil = typo + name
+    sil_samples = sum(r["runs"] for r in sil)
+    sil_reph = sum(r.get("rephrase_count", 0) for r in sil)
+    sil_rate = sil_reph / sil_samples if sil_samples else 0.0
+    lines.append("  silent-rephrase        %d/%d silence samples carried a rephrase  (%.0f%%, ceiling %.0f%%)"
+                 % (sil_reph, sil_samples, sil_rate * 100, MAX_SILENT_REPHRASE_RATE * 100))
+    for r in sil:
+        if r.get("rephrase_count"):
+            lines.append("      REPH %-8s [%d/%d runs] %s"
+                         % (r["case"]["id"], r["rephrase_count"], r["runs"], r["case"]["message"]))
+    if sil_rate > MAX_SILENT_REPHRASE_RATE:
+        ok = False
+        lines.append("      -> FAIL: silence-class rephrase rate %.0f%% exceeds ceiling %.0f%% (typo/name messages are being rewritten)"
+                     % (sil_rate * 100, MAX_SILENT_REPHRASE_RATE * 100))
+
     return lines, ok
 
 
@@ -290,6 +344,30 @@ def run_selftest():
     if apply_fixes("I tried your script this morning and is working fine", [{"wrong": "is", "fix": "it is"}]) != "I tried your script this morning and it is working fine":
         print("SELFTEST BROKEN: fix application must substitute whole words, not substrings")
         return 2
+
+    print("SELFTEST: the issue-21 gates (rephrase-recall, natural-silent, silent-rephrase) must each fail on planted results\n")
+    fake_21 = [
+        {"case": {"id": "st-rr", "class": "rephrase-recall", "message": "awkward but praised"},
+         "runs": 1, "flag_count": 0, "exact_count": 0,
+         "rephrase_count": 0, "dup_rephrases": [], "noisy_count": 0},
+        {"case": {"id": "st-nat", "class": "natural-silent", "message": "clean but rephrased"},
+         "runs": 1, "flag_count": 0, "exact_count": 0,
+         "rephrase_count": 1, "dup_rephrases": [], "noisy_count": 1},
+        {"case": {"id": "st-sil", "class": "typo-silent", "message": "typo message got a rephrase"},
+         "runs": 1, "flag_count": 0, "exact_count": 0,
+         "rephrase_count": 1, "dup_rephrases": [], "noisy_count": 1},
+    ]
+    lines_21, ok_21 = evaluate(fake_21)
+    print("\n".join(lines_21))
+    print()
+    if ok_21:
+        print("SELFTEST BROKEN: planted issue-21 failures did not trip the gate")
+        return 2
+    expected = ["standalone-rephrase recall", "natural-silent noise rate", "silence-class rephrase rate"]
+    missing = [e for e in expected if not any(e in l for l in lines_21)]
+    if missing:
+        print("SELFTEST BROKEN: gates did not fire individually: %s" % ", ".join(missing))
+        return 2
     print("SELFTEST OK: gate returned failure as expected; exiting non-zero")
     return 1
 
@@ -333,10 +411,13 @@ def main():
         rephrase_count = 0
         dup_rephrases = []
         seen = set()
+        noisy_count = 0
         for _ in range(repeats):
             flagged, categories, rephrases, dups = run_hook(case["message"], case["id"], case.get("selection"))
             if flagged:
                 flag_count += 1
+            if flagged or rephrases:
+                noisy_count += 1
             if want and want in categories:
                 exact_count += 1
             rephrase_count += rephrases
@@ -344,8 +425,9 @@ def main():
             seen |= categories
         results.append({"case": case, "runs": repeats,
                         "flag_count": flag_count, "exact_count": exact_count,
-                        "rephrase_count": rephrase_count, "dup_rephrases": dup_rephrases})
-        mark = "flag" if flag_count else "silent"
+                        "rephrase_count": rephrase_count, "dup_rephrases": dup_rephrases,
+                        "noisy_count": noisy_count})
+        mark = "flag" if flag_count else ("reph" if rephrase_count else "silent")
         suffix = "  (%d/%d flagged)" % (flag_count, repeats) if repeats > 1 else ""
         print("  [%2d/%d] %-8s %-8s %s%s" % (i, len(cases), case["class"][:8], mark, case["id"], suffix))
 
