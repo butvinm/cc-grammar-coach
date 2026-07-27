@@ -1,11 +1,35 @@
 ---
-description: Configure cc-grammar-coach; subcommand install-statusline wires grammar feedback into your statusline (one-time; idempotent)
-argument-hint: install-statusline
+description: Configure cc-grammar-coach; subcommands: install-statusline wires grammar feedback into your statusline (one-time; idempotent), categories chooses which error categories the checker flags
+argument-hint: install-statusline | categories
 ---
 
 Requested subcommand: $ARGUMENTS
 
-If the subcommand is not exactly `install-statusline`, reply with the supported usage, `/cc-grammar-coach:configure install-statusline` (wire grammar feedback into your statusline), and stop.
+If the subcommand is not exactly `install-statusline` or `categories`, reply with the supported usage - `/cc-grammar-coach:configure install-statusline` (wire grammar feedback into your statusline) or `/cc-grammar-coach:configure categories` (choose which error categories the checker flags) - and stop.
+
+# categories
+
+Let the user choose which error categories the checker flags. The catalog of every defined category is `${CLAUDE_PLUGIN_ROOT}/config/categories.txt` (one `slug: definition` line each). The active selection is the first existing file of `$GRAMMAR_HOME/enabled-categories.txt` (user selection) then `${CLAUDE_PLUGIN_ROOT}/config/enabled-categories.txt` (shipped default), one slug per line. `GRAMMAR_HOME` defaults to `~/.claude/cc-grammar-coach`.
+
+Follow these steps:
+
+1. **Read the state.** Load the catalog and the active selection, noting which file the selection came from (default or user).
+
+2. **Show evidence, not a bare list.** For each catalog category print: enabled or disabled, the definition's opening clause as a gloss, and how many times it appears in `fixes[].category` over the last 200 lines of `$GRAMMAR_HOME/history.jsonl` (0 for never-logged and for disabled categories). Then scan the `rephrase` fields of those lines for recurring corrections matching disabled categories (word reordering for `word-order`, inserted pronouns for `pronouns`, sentence splits for `punctuation`, ...) and mention any pattern you find as a suggestion to enable that category. Skip the suggestion when nothing stands out - do not invent evidence.
+
+3. **Ask what to change** in plain language (enable X, disable Y; multiple changes at once are fine). Warn before disabling a category that has logged mistakes in the window, and warn when enabling `punctuation` that casual chat often omits punctuation deliberately, so it is the noisiest category. If the user changes nothing, stop without writing.
+
+4. **Write the selection** to `$GRAMMAR_HOME/enabled-categories.txt`, one slug per line: exactly the resulting enabled set, only slugs present in the catalog, never an empty file. Creating this file means plugin updates no longer change the user's selection; mention that, and that deleting the file returns them to the shipped default.
+
+5. **Report.** Use exactly this template:
+
+   ```
+   ## Checker categories
+
+   - Enabled: <comma-separated slugs>
+   - Disabled: <comma-separated slugs>
+   - Selection file: <path, or "shipped default (no user selection written)">
+   ```
 
 # install-statusline
 
