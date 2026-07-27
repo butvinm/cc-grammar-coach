@@ -13,7 +13,7 @@ The checker runs on every message automatically: it reviews the message, appends
 
 - `✔ Looks good` - clean message, one short compliment.
 - `<wrong> → <fix> (<rule>: <why>)` - one line per grammar error.
-- `✨ <rephrase>` - optionally, a more natural rephrasing of a clearly awkward message; the `rephrase` setting turns this line off.
+- `✨ <rephrase>` - a more natural rewrite of the whole message: offered after the error lines when the fixes alone would not make it read natively, or alone - in place of the praise - when the message is grammatically correct but phrased in a way no native would use; the `rephrase` setting turns this line off.
 
 ## Drill and learn
 
