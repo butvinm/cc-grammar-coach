@@ -141,12 +141,20 @@ except Exception:
     pass
 ' 2>/dev/null)
 
-  JLINE=$(FB="$FEEDBACK" MSG="$PROMPT" STATUS="$STATUS_FILE" python3 -c '
-import os, sys, re, json, datetime
+  JLINE=$(FB="$FEEDBACK" MSG="$PROMPT" STATUS="$STATUS_FILE" PLUGIN_ROOT="$PLUGIN_ROOT" python3 -c '
+import os, sys, re, json, datetime, difflib
 
 fb = os.environ.get("FB", "")
 msg = os.environ.get("MSG", "")
 status_path = os.environ["STATUS"]
+
+slugs = set()
+try:
+    for cl in open(os.path.join(os.environ["PLUGIN_ROOT"], "config", "categories.txt"), encoding="utf-8"):
+        if cl.strip():
+            slugs.add(cl.split(":", 1)[0].strip())
+except (KeyError, OSError):
+    pass
 
 lines = []
 for l in fb.split("\n"):
@@ -156,17 +164,28 @@ for l in fb.split("\n"):
 if not lines:
     sys.exit(0)
 
-fix_re = re.compile(r"^\[([a-z-]+)\]\s+(.+?)\s+→\s+(.+?)\s+\((.+)\)\s*$")
+# The model sometimes drops the square brackets around the category ("tense fix → fixed (...)"), so the brackets are optional and the category is validated against the catalog instead; matched lines are re-emitted in the canonical bracketed form the statusline renderer parses.
+fix_re = re.compile(r"^\[?([a-z-]+)\]?\s+(.+?)\s+→\s+(.+?)\s+\((.+)\)\s*$")
 fixes, fix_lines, rephrase, praise = [], [], None, None
 for l in lines:
     m = fix_re.match(l)
-    if m:
+    if m and (m.group(1) in slugs if slugs else l.startswith("[")):
         fixes.append({"category": m.group(1), "wrong": m.group(2), "fix": m.group(3), "rule": m.group(4)})
-        fix_lines.append(l)
+        fix_lines.append("[%s] %s → %s (%s)" % (m.group(1), m.group(2), m.group(3), m.group(4)))
     elif l.lstrip().startswith("✨"):
         rephrase = l.lstrip()[1:].strip()
     elif "✔" in l:
         praise = l
+
+# Drop a ✨ line that only repeats the corrections: apply the reported fixes to the message and compare word sequences, ignoring case and punctuation. The 0.9 similarity ceiling (not exact match) also catches rephrases where the model folded in a small fix it never reported; a genuine rewrite changes order or vocabulary and lands far below it. Threshold and normalization are mirrored in eval/run.py - keep them in sync.
+if rephrase is not None:
+    corrected = msg
+    for f in fixes:
+        corrected = corrected.replace(f["wrong"], f["fix"], 1)
+    a = re.findall(r"[a-z0-9\x27]+", corrected.lower())
+    b = re.findall(r"[a-z0-9\x27]+", rephrase.lower())
+    if difflib.SequenceMatcher(None, a, b).ratio() >= 0.9:
+        rephrase = None
 
 has_content = bool(fix_lines) or rephrase is not None
 
