@@ -29,8 +29,12 @@
 {"id": "rc-pre3", "source": "synthetic", "class": "recall", "category": "prepositions", "message": "I am not sure how to protect the service against of the sudden traffic spikes today"}
 {"id": "rc-plu1", "source": "synthetic", "class": "recall", "category": "plural", "message": "I reviewed three paper this morning and found the same mistake in every one of them"}
 {"id": "rc-plu2", "source": "synthetic", "class": "recall", "category": "plural", "message": "We only have two day left before the release so we really should hurry up now"}
-{"id": "rc-vrb1", "source": "synthetic", "class": "recall", "category": "verb-form", "message": "I did not understood the reason why the build keeps failing only on the macos runner"}
-{"id": "rc-vrb2", "source": "real", "class": "recall", "category": "verb-form", "message": "How did you detected the parent branch after the whole history was already rewritten"}
-{"id": "rc-vrb3", "source": "real", "class": "recall", "category": "verb-form", "message": "does the commit skill follow the rules define in the linked config or not really here"}
+{"id": "rc-vrb1", "source": "synthetic", "class": "recall", "category": "verb-after-auxiliary", "message": "I did not understood the reason why the build keeps failing only on the macos runner"}
+{"id": "rc-vrb2", "source": "real", "class": "recall", "category": "verb-after-auxiliary", "message": "How did you detected the parent branch after the whole history was already rewritten"}
+{"id": "rc-vrb3", "source": "real", "class": "recall", "category": "verb-participle", "message": "does the commit skill follow the rules define in the linked config or not really here"}
+{"id": "rc-ger1", "source": "real", "class": "recall", "category": "verb-gerund-infinitive", "message": "please run the whole test suite before merge the branch so we catch the failure early"}
+{"id": "rc-ger2", "source": "synthetic", "class": "recall", "category": "verb-gerund-infinitive", "message": "The reviewer suggested to split this huge function into three smaller ones yesterday"}
+{"id": "rc-mis1", "source": "real", "class": "recall", "category": "verb-missing", "message": "the problem appears only when the feature flag enabled in the staging environment"}
+{"id": "rc-wfm1", "source": "synthetic", "class": "recall", "category": "word-form", "message": "I think we should choice a much simpler name for this helper before the next review"}
 {"id": "rc-que1", "source": "synthetic", "class": "recall", "category": "questions", "message": "How we can improve the recall of the checker without hurting the latency too much"}
 {"id": "rc-que2", "source": "real", "class": "recall", "category": "questions", "message": "Why you replaced the old retry logic with a plain loop inside this request handler"}

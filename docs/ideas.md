@@ -1,6 +1,6 @@
 - weekly reminder
 
-- "before commiting" and "does he" was both presented as "verb forb" but the are totally different types of mistakes, with different rules and what is more important with separate fequencies. this suggests our taxonomy is wrong. maybe we can use some standard taxonomy? from LanguageTool or some academic approach
+- (implemented) "before commiting" and "does he" was both presented as "verb forb" but the are totally different types of mistakes, with different rules and what is more important with separate fequencies. this suggests our taxonomy is wrong. maybe we can use some standard taxonomy? from LanguageTool or some academic approach
 
 - the drill generatio is too long, uses too many custom and ad-hoc actions. can we define a few mandatory steps and scripts for them? like "fetch_last_mistakes.sh", "generate_drill.sh quiz.json" or something like this?
 
