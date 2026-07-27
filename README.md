@@ -39,15 +39,20 @@ Ask in plain language ("give me a grammar drill", "quiz me on my mistakes", "let
 
 ## Install
 
-In Claude Code, add this repository as a plugin marketplace, install the plugin, and optionally wire the statusline:
+In Claude Code, add this repository as a plugin marketplace and install the plugin:
 
 ```
 /plugin marketplace add butvinm/cc-grammar-coach
 /plugin install cc-grammar-coach@cc-grammar-coach
+```
+
+Then optionally wire grammar feedback into your statusline:
+
+```
 /cc-grammar-coach:configure install-statusline
 ```
 
-The `install-statusline` step proposes either configuring a new statusline or integrating the grammar segment into your existing one; details and manual wiring: [docs/statusline.md](docs/statusline.md).
+It proposes either configuring a new statusline or integrating the grammar segment into your existing one; details and manual wiring: [docs/statusline.md](docs/statusline.md).
 
 ## Configuration
 
