@@ -7,5 +7,11 @@ questions: a question lacks do-support or subject-auxiliary inversion - "How we 
 verb-after-auxiliary: the right verb in the wrong inflection after do/does/did, a modal, or have/be - "I did not understood" → "I did not understand", "does it returns" → "does it return"
 verb-gerund-infinitive: a gerund stands where an infinitive belongs or the reverse, including the gerund required after a preposition - "before commit the change" → "before committing the change", "suggest to install" → "suggest installing"
 verb-participle: a participle or adjectival verb form is wrong - "the rules define in the config" → "the rules defined in the config", "a relate issue" → "a related issue"
-verb-missing: a required verb or auxiliary is absent, or an extra one appears - "this file referenced in the config" → "this file is referenced in the config", "the problem when deploying" → "the problem occurs when deploying"
+verb-missing: a required verb or auxiliary is absent, or an extra one appears - "this file referenced in the config" → "this file is referenced in the config", "the problem when deploying" → "the problem occurs when deploying"; a missing subject pronoun is pronouns, not verb-missing
 word-form: a noun or adjective stands where a verb belongs, or the reverse; the root is right but the part of speech is wrong - "we should choice a simpler name" → "we should choose a simpler name", "can you provider an example" → "can you provide an example"
+word-order: words stand in an unnatural order outside questions - "I do not understand what means this error" → "what this error means", "she speaks very well English" → "she speaks English very well"; a question missing inversion or do-support is questions, not word-order
+pronouns: a pronoun is missing, unnecessary, or wrong - "I tried the script and is working now" → "and it is working now", "my teammate he thinks" → "my teammate thinks"
+comparatives: a comparative or superlative is malformed - "much more simpler" → "much simpler", "the most simplest" → "the simplest"
+particles: a phrasal-verb particle is missing or wrong - "I will look the syntax in the docs" → "I will look up the syntax", "please fill the form" → "please fill in the form"
+possessives: a possessive form is missing or wrong - "my colleagues laptop" (one colleague) → "my colleague's laptop"
+punctuation: a run-on sentence or comma splice every fluent writer would break - "I restarted the server twice it still fails" → "I restarted the server twice. It still fails."

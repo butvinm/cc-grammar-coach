@@ -65,13 +65,39 @@ print("ok" if lat > 0 and cyr <= lat else "skip")
 [ "$LANG_OK" != "ok" ] && exit 0
 
 (
-  PROMPT_SYS=$(PLUGIN_ROOT="$PLUGIN_ROOT" REPHRASE="$REPHRASE" python3 -c '
+  PROMPT_SYS=$(PLUGIN_ROOT="$PLUGIN_ROOT" GRAMMAR_HOME="$GRAMMAR_HOME" REPHRASE="$REPHRASE" python3 -c '
 import os
 root = os.environ["PLUGIN_ROOT"]
+home = os.environ["GRAMMAR_HOME"]
 keep = os.environ.get("REPHRASE", "true") != "false"
 tmpl = open(os.path.join(root, "prompts", "checker.txt"), encoding="utf-8").read()
-entries = [l.strip() for l in open(os.path.join(root, "config", "categories.txt"), encoding="utf-8") if l.strip()]
-slugs = [e.split(":", 1)[0].strip() for e in entries]
+catalog = [l.strip() for l in open(os.path.join(root, "config", "categories.txt"), encoding="utf-8") if l.strip()]
+
+def slug(entry):
+    return entry.split(":", 1)[0].strip()
+
+def load_selection(path):
+    try:
+        names = {l.strip() for l in open(path, encoding="utf-8") if l.strip()}
+    except OSError:
+        return None
+    picked = [e for e in catalog if slug(e) in names]
+    return picked or None
+
+enabled = (load_selection(os.path.join(home, "enabled-categories.txt"))
+           or load_selection(os.path.join(root, "config", "enabled-categories.txt"))
+           or catalog)
+enabled_slugs = {slug(e) for e in enabled}
+disabled = [e for e in catalog if slug(e) not in enabled_slugs]
+
+def gloss(entry):
+    return entry.split(":", 1)[1].strip().split(" - \"", 1)[0]
+
+dis_line = ""
+if disabled:
+    dis_line = "- disabled error categories for this user - do not flag these even when you are sure: " + "; ".join(
+        "%s (%s)" % (slug(e), gloss(e)) for e in disabled)
+
 out, in_block = [], False
 for line in tmpl.split("\n"):
     if line.strip() == "{{REPHRASE_START}}":
@@ -85,8 +111,9 @@ for line in tmpl.split("\n"):
     out.append(line)
 import sys
 sys.stdout.write("\n".join(out)
-    .replace("{{CATEGORIES}}", ", ".join(slugs))
-    .replace("{{CATEGORY_DEFINITIONS}}", "\n".join("  - " + e for e in entries)))
+    .replace("\n{{DISABLED_CATEGORIES}}", "\n" + dis_line if dis_line else "")
+    .replace("{{CATEGORIES}}", ", ".join(slug(e) for e in enabled))
+    .replace("{{CATEGORY_DEFINITIONS}}", "\n".join("  - " + e for e in enabled)))
 ')
 
   PAYLOAD=$(MODEL="$LLM_MODEL" SYS="$PROMPT_SYS" USR="$PROMPT" python3 -c '

@@ -12,6 +12,8 @@ Each case belongs to one class, and the classes are scored separately and **neve
 
 The dataset (`cases.jsonl`) mixes deterministic synthetic cases with anonymized cases drawn from real traffic (identifiers substituted, prose grammar untouched, labels assigned fresh). No private data.
 
+Cases carrying `"selection": "full"` run with the entire catalog enabled (the harness writes `enabled-categories.txt` into the isolated `GRAMMAR_HOME`), so recall is gated for every catalog category a user can enable, not just the shipped default selection. All other cases run on the default selection - that is the configuration the silence/FP gates are calibrated for; a user's custom selection changes the false-positive surface and carries no CI guarantee.
+
 ## How to run
 
 The hook needs a model. Export the LLM settings first, then run:
