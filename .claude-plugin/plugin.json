@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "cc-grammar-coach",
+  "version": "0.4.0",
+  "description": "Out-of-band English grammar checker (UserPromptSubmit hook) that logs your mistakes and shows statusline feedback, plus drill and learn skills that turn the log into lesson-and-quiz web pages. After installing, run /cc-grammar-coach:configure install-statusline once to wire the feedback into your statusline.",
+  "author": {
+    "name": "Mikhail Butvin"
+  },
+  "homepage": "https://github.com/butvinm/cc-grammar-coach",
+  "repository": "https://github.com/butvinm/cc-grammar-coach",
+  "license": "MIT",
+  "keywords": ["grammar", "english", "language-learning", "writing", "hook", "statusline", "education"],
+  "userConfig": {
+    "native_language": {
+      "type": "string",
+      "title": "Native language",
+      "description": "Your native language, used by the drill and learn skills to explain English grammar with contrasts you will recognize. Leave empty for generic, language-neutral lessons."
+    },
+    "rephrase": {
+      "type": "boolean",
+      "title": "Suggest rephrasings",
+      "description": "When enabled, the checker may append a single more-natural rewrite of the whole message when it is clearly awkward. Grammar flags are shown regardless of this setting.",
+      "default": true
+    },
+    "llm_base_url": {
+      "type": "string",
+      "title": "LLM base URL",
+      "description": "OpenAI-compatible chat-completions endpoint base URL for the checker. Required: the checker stays inactive until the base URL, model, and API key are all set."
+    },
+    "llm_model": {
+      "type": "string",
+      "title": "LLM model",
+      "description": "Model identifier passed to the checker endpoint.",
+      "default": "openai/gpt-oss-120b"
+    },
+    "llm_api_key": {
+      "type": "string",
+      "title": "LLM API key",
+      "description": "API key for the checker endpoint. Stored outside settings.json and injected into the hook environment only.",
+      "sensitive": true
+    }
+  }
+}
