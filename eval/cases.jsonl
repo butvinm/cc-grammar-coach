@@ -38,3 +38,11 @@
 {"id": "rc-wfm1", "source": "synthetic", "class": "recall", "category": "word-form", "message": "I think we should choice a much simpler name for this helper before the next review"}
 {"id": "rc-que1", "source": "synthetic", "class": "recall", "category": "questions", "message": "How we can improve the recall of the checker without hurting the latency too much"}
 {"id": "rc-que2", "source": "real", "class": "recall", "category": "questions", "message": "Why you replaced the old retry logic with a plain loop inside this request handler"}
+{"id": "rc-wo1", "source": "synthetic", "class": "recall", "category": "word-order", "selection": "full", "message": "I do not understand what means this error in the second line of the traceback"}
+{"id": "rc-wo2", "source": "synthetic", "class": "recall", "category": "word-order", "selection": "full", "message": "He speaks very well English but he still prefers to write the documentation in French"}
+{"id": "rc-pro1", "source": "synthetic", "class": "recall", "category": "pronouns", "selection": "full", "message": "I tried your script this morning and is working fine now so we can merge it today"}
+{"id": "rc-pro2", "source": "synthetic", "class": "recall", "category": "pronouns", "selection": "full", "message": "My teammate he thinks that we should rewrite this whole module in Go instead of Python"}
+{"id": "rc-cmp1", "source": "synthetic", "class": "recall", "category": "comparatives", "selection": "full", "message": "This approach is much more simpler than the old one and it needs far less code overall"}
+{"id": "rc-par1", "source": "synthetic", "class": "recall", "category": "particles", "selection": "full", "message": "I will look the exact syntax in the docs and get back to you in a few minutes"}
+{"id": "rc-pos1", "source": "synthetic", "class": "recall", "category": "possessives", "selection": "full", "message": "I think my colleagues laptop is faster than mine because his build takes half the time"}
+{"id": "rc-pun1", "source": "synthetic", "class": "recall", "category": "punctuation", "selection": "full", "message": "I restarted the server twice it still returns the same error on every single request"}

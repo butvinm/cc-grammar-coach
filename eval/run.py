@@ -39,6 +39,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN_ROOT = os.path.dirname(HERE)
 HOOK = os.path.join(PLUGIN_ROOT, "hooks", "grammar-check.sh")
 CASES = os.path.join(HERE, "cases.jsonl")
+CATALOG = os.path.join(PLUGIN_ROOT, "config", "categories.txt")
+
+
+def catalog_slugs():
+    return [l.split(":", 1)[0].strip() for l in open(CATALOG, encoding="utf-8") if l.strip()]
 
 PER_CASE_TIMEOUT = 90
 MIN_RECALL = float(os.environ.get("GRAMMAR_EVAL_MIN_RECALL", "0.7"))
@@ -77,13 +82,18 @@ def load_cases(path):
     return cases
 
 
-def run_hook(message, case_id):
+def run_hook(message, case_id, selection=None):
     """Invoke the shipped hook once for one message in a fresh GRAMMAR_HOME.
 
     Returns (flagged, categories). flagged is whether the isolated history.jsonl recorded any fix (the authoritative signal - the status file is a display subset of the same match, so it adds nothing); categories is the set of category slugs seen.
+
+    selection="full" enables the whole catalog by writing enabled-categories.txt into the isolated GRAMMAR_HOME, so recall cases for categories outside the default selection can be scored; without it the hook runs on the shipped default selection, which is what the silence gates are calibrated for.
     """
     home = tempfile.mkdtemp(prefix="grammar-eval-")
     try:
+        if selection == "full":
+            with open(os.path.join(home, "enabled-categories.txt"), "w", encoding="utf-8") as fh:
+                fh.write("\n".join(catalog_slugs()) + "\n")
         env = dict(os.environ)
         env["GRAMMAR_HOME"] = home
         env["GRAMMAR_HOOK_SYNC"] = "1"
@@ -254,7 +264,7 @@ def main():
         exact_count = 0
         seen = set()
         for _ in range(repeats):
-            flagged, categories = run_hook(case["message"], case["id"])
+            flagged, categories = run_hook(case["message"], case["id"], case.get("selection"))
             if flagged:
                 flag_count += 1
             if want and want in categories:
