@@ -5,7 +5,7 @@
 The checker emits plain-text lines that the statusline renderer colors and the drill parses. The three markers are Unicode and load-bearing: `→` (U+2192) separates wrong from fix, `✔` (U+2714) marks the praise line, `✨` (U+2728) marks the rephrase line. They must appear verbatim in the prompt (`prompts/checker.txt`), the parsers, and any test fixture; substituting ASCII `->` silently empties the mistake log.
 
 - `✔ <compliment>` - clean message; doubles as the liveness signal, so it must never render blank.
-- `[<category>] <wrong> → <fix> (<rule>: <why>)` - one line per grammar error; category slugs and their one-line definitions come from the catalog `config/categories.txt`, filtered by the enabled selection (`$GRAMMAR_HOME/enabled-categories.txt` if the user wrote one, else `config/enabled-categories.txt`); enabled entries are injected into the checker prompt as flaggable categories and disabled ones as explicit silence items (see `docs/taxonomy.md`). The statusline renderer drops the `[<category>]` tag for display; the drill groups by it.
+- `[<category>] <wrong> → <fix> (<rule>: <why>)` - one line per grammar error; category slugs and their one-line definitions come from the catalog `config/categories.txt`, filtered by the enabled selection (`$GRAMMAR_HOME/enabled-categories.txt` if the user wrote one, else `config/enabled-categories.txt`); enabled entries are injected into the checker prompt as flaggable categories and disabled ones as explicit silence items (see `docs/mistake-categories.md`). The statusline renderer drops the `[<category>]` tag for display; the drill groups by it.
 - `✨ <rephrase>` - one optional natural rephrasing of the whole message; never emitted together with the `✔` line.
 
 ## The eval

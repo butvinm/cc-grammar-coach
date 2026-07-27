@@ -47,13 +47,19 @@ In Claude Code, add this repository as a plugin marketplace, install the plugin,
 /cc-grammar-coach:configure install-statusline
 ```
 
-`/cc-grammar-coach:configure install-statusline` proposes either configuring a new statusline or integrating the grammar segment into your existing one; details and manual wiring: [docs/statusline.md](docs/statusline.md).
+The `install-statusline` step proposes either configuring a new statusline or integrating the grammar segment into your existing one; details and manual wiring: [docs/statusline.md](docs/statusline.md).
 
 ## Configuration
 
 On install, Claude Code prompts you for these settings; change them later from the `/plugin` menu.
 
-The checker flags only the error categories you have enabled. The default selection covers the core grammar categories (articles, agreement, tense, prepositions, and so on); more are defined in the catalog but start disabled - word order, pronouns, comparatives, phrasal-verb particles, possessives, and a narrow punctuation category. Run `/cc-grammar-coach:configure categories` to review and change your selection with evidence from your own mistake log; details in [docs/taxonomy.md](docs/taxonomy.md).
+The checker flags only the error categories you have enabled. The default selection covers the core grammar categories (articles, agreement, tense, prepositions, and so on); more are defined in the catalog but start disabled - word order, pronouns, comparatives, phrasal-verb particles, possessives, and a narrow punctuation category. To review and change your selection with evidence from your own mistake log, run:
+
+```
+/cc-grammar-coach:configure mistake-categories
+```
+
+Details in [docs/mistake-categories.md](docs/mistake-categories.md).
 
 | Field             | Type               | Default               | Meaning                                                                                                                                       |
 | ----------------- | ------------------ | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
