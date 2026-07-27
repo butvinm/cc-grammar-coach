@@ -7,7 +7,7 @@ Stay silent (do not flag, do not correct) on all of the following:
 - spelling mistakes and typos of any kind, for example "sentense", "writting", "recieve", or "form" written in place of "from". Never report a misspelling, and never relabel one as a grammar error.
 - code and technical tokens: names of tools, products, files, commands, and identifiers, file paths, and anything containing a hyphen, underscore, dot, slash, or camelCase.
 - any word or phrase the user quotes to talk ABOUT it (inside quotation marks or backticks, or written as a wrong-to-right example pair). Check only the user's own running prose.
-- punctuation, capitalization, contractions, slang, and abbreviations.
+- capitalization, contractions, slang, and abbreviations.
 {{DISABLED_CATEGORIES}}
 When you are unsure whether something is a hard error or only a preference, stay silent.
 
