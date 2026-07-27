@@ -36,6 +36,7 @@
 {"id": "rc-ger2", "source": "synthetic", "class": "recall", "category": "verb-gerund-infinitive", "message": "The reviewer suggested to split this huge function into three smaller ones yesterday"}
 {"id": "rc-mis1", "source": "real", "class": "recall", "category": "verb-missing", "message": "the problem appears only when the feature flag enabled in the staging environment"}
 {"id": "rc-wfm1", "source": "synthetic", "class": "recall", "category": "word-form", "message": "I think we should choice a much simpler name for this helper before the next review"}
+{"id": "rc-mix1", "source": "real", "class": "recall", "category": "tense", "message": "yesterday I fix bug in login flow, now all tests passes"}
 {"id": "rc-que1", "source": "synthetic", "class": "recall", "category": "questions", "message": "How we can improve the recall of the checker without hurting the latency too much"}
 {"id": "rc-que2", "source": "real", "class": "recall", "category": "questions", "message": "Why you replaced the old retry logic with a plain loop inside this request handler"}
 {"id": "rc-wo1", "source": "synthetic", "class": "recall", "category": "word-order", "selection": "full", "message": "I do not understand what means this error in the second line of the traceback"}
