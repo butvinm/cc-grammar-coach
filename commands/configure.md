@@ -1,13 +1,18 @@
 ---
-description: Configure cc-grammar-coach; subcommands: install-statusline wires grammar feedback into your statusline (one-time; idempotent), categories chooses which error categories the checker flags
-argument-hint: install-statusline | categories
+description: Configure cc-grammar-coach; subcommands: install-statusline wires grammar feedback into your statusline (one-time; idempotent), mistake-categories chooses which error categories the checker flags
+argument-hint: install-statusline | mistake-categories
 ---
 
 Requested subcommand: $ARGUMENTS
 
-If the subcommand is not exactly `install-statusline` or `categories`, reply with the supported usage - `/cc-grammar-coach:configure install-statusline` (wire grammar feedback into your statusline) or `/cc-grammar-coach:configure categories` (choose which error categories the checker flags) - and stop.
+If the subcommand is not exactly `install-statusline` or `mistake-categories`, reply with the supported usage and stop, presenting the commands in a fenced code block exactly like this:
 
-# categories
+```
+/cc-grammar-coach:configure install-statusline    # wire grammar feedback into your statusline
+/cc-grammar-coach:configure mistake-categories    # choose which error categories the checker flags
+```
+
+# mistake-categories
 
 Let the user choose which error categories the checker flags. The catalog of every defined category is `${CLAUDE_PLUGIN_ROOT}/config/categories.txt` (one `slug: definition` line each). The active selection is the first existing file of `$GRAMMAR_HOME/enabled-categories.txt` (user selection) then `${CLAUDE_PLUGIN_ROOT}/config/enabled-categories.txt` (shipped default), one slug per line. `GRAMMAR_HOME` defaults to `~/.claude/cc-grammar-coach`.
 

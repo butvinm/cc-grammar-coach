@@ -1,4 +1,4 @@
-# Mistake taxonomy
+# Categories of mistakes
 
 The taxonomy is split into a **catalog** (every category the checker knows how to define) and a **selection** (the subset a given user has enabled). The checker flags only selected categories; the drill practices whatever got logged.
 
@@ -11,7 +11,11 @@ slug: definition
 - `slug` is lowercase-hyphen (`[a-z-]+`), because the hook's fix-line regex in `hooks/grammar-check.sh` accepts nothing else; it is what gets logged to `history.jsonl` and counted by the drill ranking.
 - `definition` is one line stating what the category covers, with wrong → fixed examples and, where two categories could collide, a boundary note naming the winner (see the `tense` and `questions` lines). The line is injected verbatim into the checker prompt, so the examples must use the literal `→` arrow the wire format requires.
 
-**Selection**: a flat list of enabled slugs, one per line. The hook reads `$GRAMMAR_HOME/enabled-categories.txt` if the user has one, else the shipped default `config/enabled-categories.txt`. Slugs not in the catalog are ignored; an empty or fully invalid selection falls back down that chain. The default names its slugs explicitly - never "all" - so catalog growth in a plugin update cannot silently widen what gets flagged. Users change their selection with `/cc-grammar-coach:configure categories` or by editing the `$GRAMMAR_HOME` file directly.
+**Selection**: a flat list of enabled slugs, one per line. The hook reads `$GRAMMAR_HOME/enabled-categories.txt` if the user has one, else the shipped default `config/enabled-categories.txt`. Slugs not in the catalog are ignored; an empty or fully invalid selection falls back down that chain. The default names its slugs explicitly - never "all" - so catalog growth in a plugin update cannot silently widen what gets flagged. Users change their selection by editing the `$GRAMMAR_HOME` file directly, or with:
+
+```
+/cc-grammar-coach:configure mistake-categories
+```
 
 The hook assembles the checker prompt from both: `{{CATEGORIES}}` becomes the enabled slug list, `{{CATEGORY_DEFINITIONS}}` the enabled definition lines, and `{{DISABLED_CATEGORIES}}` an explicit do-not-flag silence line built from the disabled catalog entries - deselecting a category actively silences it rather than leaving it undefined.
 
