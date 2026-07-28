@@ -43,6 +43,7 @@ __DUO_CSS__
       <div class="duo-stack duo-stack--tight">
         <h1 class="duo-title">Grammar Drill</h1>
         <div class="duo-muted" id="date"></div>
+        <div class="duo-muted" style="font-size: var(--duo-text-sm)">Keyboard: number keys or &uarr;/&darr; pick an answer &middot; Enter checks &middot; Esc comes back here</div>
       </div>
       <div class="duo-row" id="chips"></div>
       <div class="duo-stack duo-stack--loose" id="topics"></div>
@@ -145,7 +146,7 @@ function questionMarkup(q) {
     `<h2 class="duo-prompt">${esc(q.prompt)}</h2>` +
     `<div class="duo-stack">` +
       (q.type === 'choice'
-        ? q.options.map(o => `<button class="duo-option">${esc(o)}</button>`).join('')
+        ? q.options.map((o, i) => `<button class="duo-option"><span class="duo-key">${i + 1}</span><span>${esc(o)}</span></button>`).join('')
         : '<input class="duo-input">') +
     `</div>` +
     `<div class="duo-feedback duo-bottom">` +
@@ -232,7 +233,12 @@ function nextQuestion() {
     q.options.forEach((opt, i) => {
       const b = document.createElement('button');
       b.className = 'duo-option';
-      b.textContent = opt;
+      const key = document.createElement('span');
+      key.className = 'duo-key';
+      key.textContent = i + 1;
+      const label = document.createElement('span');
+      label.textContent = opt;
+      b.append(key, label);
       b.onclick = () => select(i, body);
       body.appendChild(b);
     });
@@ -342,9 +348,29 @@ $('actionBtn').onclick = () => {
 
 document.addEventListener('keyup', e => { if (e.key === 'Enter') enterLocked = false; });
 document.addEventListener('keydown', e => {
-  if (e.key !== 'Enter' || enterLocked || $('actionBtn').disabled) return;
-  e.preventDefault();
-  $('actionBtn').click();
+  if (e.key === 'Enter') {
+    if (enterLocked || $('actionBtn').disabled) return;
+    e.preventDefault();
+    $('actionBtn').click();
+    return;
+  }
+  if (e.key === 'Escape') {
+    if (phase !== 'start') { e.preventDefault(); toLessons(); }
+    return;
+  }
+  // Selection keys act only while a choice question awaits an answer; rewrite
+  // questions have no options, so digits typed into the input fall through here.
+  if (phase !== 'answer') return;
+  const opts = [...$('qbody').querySelectorAll('.duo-option')];
+  if (!opts.length) return;
+  if (/^[1-9]$/.test(e.key)) {
+    const i = +e.key - 1;
+    if (i < opts.length) { e.preventDefault(); select(i, $('qbody')); }
+  } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const d = e.key === 'ArrowDown' ? 1 : -1;
+    select(selected < 0 ? (d === 1 ? 0 : opts.length - 1) : (selected + d + opts.length) % opts.length, $('qbody'));
+  }
 });
 
 fit();

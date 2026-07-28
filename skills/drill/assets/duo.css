@@ -250,7 +250,9 @@
 /* ---------- selectable options ---------- */
 
 .duo-option {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--duo-space-3);
   width: 100%;
   text-align: left;
   font: inherit;
@@ -283,6 +285,20 @@
   background: var(--duo-danger-soft);
   border-color: var(--duo-danger);
   color: var(--duo-danger-ink);
+}
+
+/* The keycap hint on a selectable option; inherits the option's state colors. */
+.duo-key {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--duo-space-4);
+  height: var(--duo-space-4);
+  font-size: var(--duo-text-xs);
+  font-weight: var(--duo-weight-heavy);
+  border: var(--duo-stroke) solid currentColor;
+  border-radius: var(--duo-radius-sm);
+  opacity: 0.55;
 }
 
 /* ---------- text input ---------- */
