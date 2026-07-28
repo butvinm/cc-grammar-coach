@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grammar Progress</title>
+<style>
+__DUO_CSS__
+
+/* Page-specific composition. Anything reusable belongs in duo.css instead. */
+* { box-sizing: border-box; }
+
+/* duo-page centers its single child; this page flows top-down instead. place-items
+   must be reset too - modern engines apply justify-items to block children. */
+.pg-page { display: block; place-items: normal; }
+.pg-wrap { max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--duo-space-4); }
+
+.pg-panel { display: flex; flex-direction: column; gap: var(--duo-space-3); }
+.pg-panel__head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--duo-space-2); }
+
+/* The plot: a 36px left gutter carries the y tick labels; hairline gridlines and
+   the band row are positioned over the same area so bars and lines share the
+   baseline, which is the plot's bottom border. */
+.pg-plot { position: relative; height: var(--pg-plot-h, 180px); border-bottom: 1px solid var(--duo-border); }
+.pg-grid-line { position: absolute; left: var(--pg-gutter, 36px); right: 0; border-top: 1px solid var(--duo-border); }
+.pg-grid-line span {
+  position: absolute;
+  right: calc(100% + var(--duo-space-2));
+  transform: translateY(-50%);
+  font-size: var(--duo-text-xs);
+  color: var(--duo-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pg-bands {
+  position: absolute;
+  inset: 0 0 0 var(--pg-gutter, 36px);
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+.pg-band {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: var(--duo-radius-sm) var(--duo-radius-sm) 0 0;
+}
+.pg-band:hover { background: var(--duo-info-soft); }
+/* min-height keeps a single mistake visible as a sliver on the shared scale. */
+.pg-bar {
+  width: min(24px, 100%);
+  min-height: 2px;
+  background: var(--duo-info-ink);
+  border-radius: var(--duo-space-1) var(--duo-space-1) 0 0;
+}
+.pg-band:hover .pg-bar { filter: brightness(1.12); }
+
+.pg-xaxis {
+  display: flex;
+  gap: 2px;
+  padding-left: var(--pg-gutter, 36px);
+  font-size: var(--duo-text-xs);
+  color: var(--duo-text-muted);
+}
+.pg-xaxis span { flex: 1; min-width: 0; text-align: center; white-space: nowrap; }
+
+.pg-multiples { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--duo-space-3); }
+
+.pg-tip {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10;
+  background: var(--duo-surface);
+  border: var(--duo-stroke) solid var(--duo-border);
+  border-radius: var(--duo-radius-sm);
+  padding: var(--duo-space-1) var(--duo-space-2);
+  font-size: var(--duo-text-sm);
+  white-space: nowrap;
+}
+.pg-tip b { font-weight: var(--duo-weight-heavy); }
+
+.pg-details summary { cursor: pointer; font-size: var(--duo-text-lg); font-weight: var(--duo-weight-heavy); }
+.pg-tablewrap { overflow-x: auto; margin-top: var(--duo-space-3); }
+.pg-table { border-collapse: collapse; width: 100%; font-size: var(--duo-text-sm); font-variant-numeric: tabular-nums; }
+.pg-table th, .pg-table td { padding: var(--duo-space-1) var(--duo-space-2); border-bottom: 1px solid var(--duo-border); text-align: right; }
+.pg-table th:first-child, .pg-table td:first-child { text-align: left; }
+.pg-table thead th { color: var(--duo-text-muted); font-size: var(--duo-text-xs); text-transform: uppercase; letter-spacing: 0.06em; }
+.pg-table tr:last-child td { font-weight: var(--duo-weight-bold); }
+</style>
+</head>
+<body class="duo-page pg-page">
+
+<main class="pg-wrap">
+  <div class="duo-stack duo-stack--tight">
+    <h1 class="duo-title">Grammar Progress</h1>
+    <div class="duo-muted" id="span"></div>
+  </div>
+
+  <div class="duo-row">
+    <div class="duo-stat duo-stat--info">
+      <div class="duo-stat__cap">Logged mistakes</div>
+      <div class="duo-stat__value" id="statMistakes"></div>
+    </div>
+    <div class="duo-stat">
+      <div class="duo-stat__cap">Last 7 days</div>
+      <div class="duo-stat__value" id="statLast7"></div>
+    </div>
+    <div class="duo-stat">
+      <div class="duo-stat__cap">Categories</div>
+      <div class="duo-stat__value" id="statCategories"></div>
+    </div>
+  </div>
+
+  <section class="duo-card pg-panel">
+    <div class="pg-panel__head">
+      <h2 class="duo-heading">All mistakes</h2>
+      <span class="duo-muted" id="allUnit"></span>
+    </div>
+    <div id="allChart" class="duo-stack duo-stack--tight"></div>
+  </section>
+
+  <section class="duo-stack duo-stack--loose">
+    <div class="pg-panel__head">
+      <h2 class="duo-heading">By category</h2>
+      <span class="duo-muted" id="multiNote"></span>
+    </div>
+    <div class="pg-multiples" id="multiples"></div>
+  </section>
+
+  <details class="duo-card pg-details">
+    <summary>Table view</summary>
+    <div class="pg-tablewrap" id="tablewrap"></div>
+  </details>
+
+  <div class="duo-muted" style="font-size: var(--duo-text-sm)" id="note"></div>
+</main>
+
+<script>
+const DATA = __PROGRESS_DATA__;
+
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+
+/* Even maxima keep the mid tick an integer. */
+const niceMax = m => m <= 10 ? Math.max(2, 2 * Math.ceil(m / 2)) : 10 * Math.ceil(m / 10);
+
+/* ---------- tooltip ---------- */
+
+const tip = el('div', 'pg-tip duo-hidden');
+document.body.append(tip);
+
+function bindTips(bands) {
+  bands.addEventListener('pointerover', e => {
+    const band = e.target.closest('.pg-band');
+    if (!band) return;
+    tip.replaceChildren(el('b', '', band.dataset.value), ' ', el('span', 'duo-muted', band.dataset.label));
+    tip.classList.remove('duo-hidden');
+  });
+  bands.addEventListener('pointermove', e => {
+    tip.style.left = Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8) + 'px';
+    tip.style.top = (e.clientY - tip.offsetHeight - 12) + 'px';
+  });
+  bands.addEventListener('pointerout', () => tip.classList.add('duo-hidden'));
+}
+
+/* ---------- chart ---------- */
+
+function renderChart(values, yMax, name, ticks) {
+  const plot = el('div', 'pg-plot');
+  [[50, yMax / 2], [100, yMax]].forEach(([pct, v]) => {
+    const line = el('div', 'pg-grid-line');
+    line.style.bottom = pct + '%';
+    if (ticks) line.append(el('span', '', String(v)));
+    plot.append(line);
+  });
+  const bands = el('div', 'pg-bands');
+  values.forEach((v, i) => {
+    const band = el('div', 'pg-band');
+    band.dataset.value = v;
+    band.dataset.label = name + ' \u00b7 ' + DATA.labels[i];
+    if (v > 0) {
+      const bar = el('div', 'pg-bar');
+      bar.style.height = (100 * v / yMax) + '%';
+      band.append(bar);
+    }
+    bands.append(band);
+  });
+  plot.append(bands);
+  bindTips(bands);
+  const xaxis = el('div', 'pg-xaxis');
+  const step = Math.max(1, Math.ceil(values.length / 6));
+  DATA.labels.forEach((l, i) => xaxis.append(el('span', '', i % step === 0 ? l : '')));
+  const frag = document.createDocumentFragment();
+  frag.append(plot, xaxis);
+  return frag;
+}
+
+/* ---------- page ---------- */
+
+$('span').textContent = DATA.span + ' \u00b7 ' + DATA.unitLabel + ' buckets';
+$('statMistakes').textContent = DATA.stats.mistakes;
+$('statLast7').textContent = DATA.stats.last7;
+$('statCategories').textContent = DATA.stats.categories;
+
+$('allUnit').textContent = 'per ' + DATA.unit;
+$('allChart').append(renderChart(DATA.total, niceMax(Math.max(...DATA.total)), 'All mistakes', true));
+
+const catMax = niceMax(Math.max(...DATA.categories.flatMap(c => c.counts)));
+$('multiNote').textContent = 'shared scale, 0-' + catMax + ' per ' + DATA.unit;
+DATA.categories.forEach(c => {
+  const card = el('div', 'duo-card pg-panel');
+  card.style.setProperty('--pg-plot-h', '96px');
+  const head = el('div', 'pg-panel__head');
+  head.append(el('h3', 'duo-heading', c.label), el('span', 'duo-muted', String(c.total)));
+  card.append(head, renderChart(c.counts, catMax, c.label, false));
+  $('multiples').append(card);
+});
+
+const table = el('table', 'pg-table');
+const thead = el('thead');
+const hrow = el('tr');
+hrow.append(el('th', '', DATA.unit));
+DATA.categories.forEach(c => hrow.append(el('th', '', c.label)));
+hrow.append(el('th', '', 'Total'));
+thead.append(hrow);
+const tbody = el('tbody');
+DATA.labels.forEach((l, i) => {
+  const row = el('tr');
+  row.append(el('td', '', l));
+  DATA.categories.forEach(c => row.append(el('td', '', String(c.counts[i]))));
+  row.append(el('td', '', String(DATA.total[i])));
+  tbody.append(row);
+});
+const trow = el('tr');
+trow.append(el('td', '', 'Total'));
+DATA.categories.forEach(c => trow.append(el('td', '', String(c.total))));
+trow.append(el('td', '', String(DATA.stats.mistakes)));
+tbody.append(trow);
+table.append(thead, tbody);
+$('tablewrap').append(table);
+
+let note = 'Raw counts of flagged mistakes: a ' + DATA.unit + ' with more written English naturally shows more mistakes.';
+if (DATA.undated > 0) note += ' ' + DATA.undated + ' mistakes without a readable timestamp are not plotted.';
+$('note').textContent = note;
+</script>
+</body>
+</html>
