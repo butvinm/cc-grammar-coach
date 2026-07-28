@@ -3,7 +3,7 @@
 An English grammar coach for Claude Code, in two parts:
 
 - a **checker** hook that reviews every English message you send, out of band, logs the mistakes it finds, and shows short feedback in your statusline;
-- **drill** and **learn** skills that turn that log into personalized lesson-and-quiz web pages: drill practices your logged mistakes, learn teaches the next topic from a weekly syllabus.
+- **drill**, **learn**, and **progress** skills that turn that log into personalized local web pages: drill practices your logged mistakes, learn teaches the next topic from a weekly syllabus, progress charts your mistake frequency by category over time.
 
 ## The checker
 
@@ -24,12 +24,22 @@ Ask in plain language ("give me a grammar drill", "quiz me on my mistakes", "let
 /cc-grammar-coach:learn
 ```
 
-**Drill** ranks your recent weak spots from the mistake log and builds a lesson plus quiz per topic, drawn from your own logged mistakes. **Learn** teaches the next new topic from the weekly syllabus, one per week. Either way you get a self-contained HTML page that grades your answers in the browser offline, explaining each answer by contrast with your native language when one is configured.
+**Drill** ranks your recent weak spots from the mistake log and builds a lesson plus quiz per topic, drawn from your own logged mistakes. **Learn** teaches the next new topic from the weekly syllabus, one per week. Either way you get a self-contained HTML page that grades your answers in the browser offline, explaining each answer by contrast with your native language when one is configured. The quiz is fully keyboard-driven: number keys or arrow keys pick an answer, Enter checks it, Esc returns to the lessons.
 
 <p align="center">
   <img src="docs/img/quiz-correct.png" width="49%" alt="A choice question answered correctly, with the rule explained">
   <img src="docs/img/quiz-mistake.png" width="49%" alt="A rewrite question answered wrongly, with the fix explained by contrast with the native language">
 </p>
+
+## Progress
+
+```
+/cc-grammar-coach:progress
+```
+
+**Progress** charts the mistake log over time - a column chart of all mistakes plus a small-multiple panel per category - so you can see which weak spots are shrinking. Counts are raw flagged mistakes: a day with more written English naturally shows more of them.
+
+![Mistake frequency by category over time](docs/img/progress.png)
 
 ## Requirements
 

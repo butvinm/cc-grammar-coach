@@ -42,7 +42,7 @@
   Questions: 15
 ```
 
-- UI/UX - list with all mistakes grouped by types with their frequencies, grammar lesson for any selected mistake type, keyboard navigation
+- (partially implemented via #4: quiz keyboard navigation and the progress skill's frequency charts; the grouped mistake list with per-type lessons is still open) UI/UX - list with all mistakes grouped by types with their frequencies, grammar lesson for any selected mistake type, keyboard navigation
 
 - concise statusline mode. user's message repeated verbatim with diff-like mistakes correction:
   Could you provide <red>a</red>strict, logical reasoning why both interactive-review and user-story <red>falls<red><gray>-></gray><green>falls</green> under <green>the</green> "feedback" group?

@@ -9,7 +9,7 @@ Turn the mistakes logged by the grammar-check hook into a lesson-plus-quiz web p
 
 The user's native language is `${user_config.native_language}`. When it is set, contrast English rules with the habits that language causes (for example a language with no articles, freer word order, or aspect instead of tense variety). When it is empty, give generic English lessons and do not assume any nationality.
 
-To teach a new topic from the weekly syllabus instead of drilling logged mistakes, use the `learn` skill.
+To teach a new topic from the weekly syllabus instead of drilling logged mistakes, use the `learn` skill; to chart mistake frequency over time, use the `progress` skill.
 
 ## Where the data lives
 

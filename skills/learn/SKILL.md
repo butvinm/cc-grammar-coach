@@ -9,7 +9,7 @@ Teach the next new topic from the weekly syllabus as a lesson-plus-quiz web page
 
 The user's native language is `${user_config.native_language}`. When it is set, contrast English rules with the habits that language causes (for example a language with no articles, freer word order, or aspect instead of tense variety). When it is empty, give generic English lessons and do not assume any nationality.
 
-To practice the user's logged mistakes instead of teaching new material, use the `drill` skill.
+To practice the user's logged mistakes instead of teaching new material, use the `drill` skill; to chart mistake frequency over time, use the `progress` skill.
 
 ## Where the data lives
 
