@@ -221,9 +221,13 @@ Evidence and outcomes:
 
 ### Task 10: Live handover
 
-- [ ] start the server on the real `$GRAMMAR_HOME` (background, `--no-open`) with the fresh data authored by the Task 8 skill runs still present
-- [ ] hand the user working links in the final report: `http://127.0.0.1:<port>/#drills`, `http://127.0.0.1:<port>/#drill=<freshest drill file>`, and `http://127.0.0.1:<port>/#progress`, plus the one-line restart command for later sessions
-- [ ] verify each link with a `curl` status check and one final screenshot of `#drills` immediately before reporting them
+- [x] start the server on the real `$GRAMMAR_HOME` (background, `--no-open`) with the fresh data authored by the Task 8 skill runs still present
+- [x] hand the user working links in the final report: `http://127.0.0.1:<port>/#drills`, `http://127.0.0.1:<port>/#drill=<freshest drill file>`, and `http://127.0.0.1:<port>/#progress`, plus the one-line restart command for later sessions
+- [x] verify each link with a `curl` status check and one final screenshot of `#drills` immediately before reporting them
+- [decision] the server that Task 8/9 left on 8437 was already serving the current code (`$GRAMMAR_HOME/dashboard/` `cmp`-clean against the repo, `GET /` byte-identical to `dashboard/index.html`, `/api/health` reporting 0.6.0), so nothing was stale - but it was parented to this session's shell and shared its process group, so it was killed and relaunched under `setsid nohup` as its own session leader (`STAT SNs`). Survival is not an inference: the launching background shell has already exited and the listener is still bound
+- note: two leftover fixture servers from Tasks 8/9 (scratchpad homes on ports 8471 and 8472) were stopped in the same pass - they served throwaway copies and would otherwise have outlived the session alongside the real one
+- verified: with the real home served, `/`, `/duo.css`, `/api/health`, `/api/drills`, `/api/history`, `/api/results` and both fresh drill files (`/api/drills/drill-2026-07-29-1714.json`, `/api/drills/drill-2026-07-29-1719.json`) all return 200; `/api/drills` lists exactly the two JSON sessions newest-first with the legacy `drill-2026-07-26-0234.html` ignored. Hash routes are client-side, so they were driven in headless chromium instead of curl: `#drill=...1719` opens "New Lesson" (1 topic), `#drill=...1714` opens "Grammar Drill" (3 topics, 18 questions), `#progress` renders 12 chart panels, zero console/page errors across all three
+- note: the final `#drills` screenshot (read back before reporting) shows both fresh sessions - the blue `LEARN` card "Present perfect vs past simple · new topic" above the green `DRILL` card with "Articles · 124 logged", "Question formation · 33 logged", "Prepositions · 26 logged". Neither card carries a score line, which is correct: the real `results.jsonl` is still empty because every quiz run in Tasks 8 and 9 went to a fixture or a byte copy
 
 ## Post-Completion
 
