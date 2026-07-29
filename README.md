@@ -26,6 +26,12 @@ python3 "$GRAMMAR_HOME/dashboard/server.py"
 
 It opens your browser at `http://127.0.0.1:8437/` and serves until you press Ctrl+C or close the terminal - there is no daemon and no autostart. Running it again while it is already up just reopens the tab. Set `GRAMMAR_DASHBOARD_PORT` if 8437 is taken. The drill, learn, and progress skills launch this same command, so a skill invocation and your own launch land on the same dashboard. The path is stable across plugin updates: the checker hook refreshes that copy of the app on the first message of a session, which is also when it first appears after install.
 
+A server a skill started has no terminal of its own - it is a child of your Claude Code session and outlives the reply. To stop one, or to restart it after a plugin update so it serves the refreshed app:
+
+```
+pkill -f "dashboard/server.py"
+```
+
 ![The dashboard's session list, with a lesson and a drill](docs/img/dashboard-drills.png)
 
 The server binds `127.0.0.1` only and rejects requests that do not address it as localhost, so the dashboard is reachable from your machine and nowhere else. It is a local server rather than a file you can double-click: the pages need it running, because they read your live mistake log and record your quiz results as you go.
@@ -39,7 +45,7 @@ Ask in plain language ("give me a grammar drill", "quiz me on my mistakes", "let
 /cc-grammar-coach:learn
 ```
 
-**Drill** ranks your recent weak spots from the mistake log and builds a lesson plus quiz per topic, drawn from your own logged mistakes. **Learn** teaches the next new topic from the weekly syllabus, one per week. Either way the skill writes the session into the dashboard and opens it there, explaining each answer by contrast with your native language when one is configured. Every session stays in the list, so you can reread a lesson or retake its quiz later, and each attempt's score is kept. The quiz is fully keyboard-driven: number keys or arrow keys pick an answer, Enter checks it, Esc returns to the lessons and again to the session list.
+**Drill** ranks your recent weak spots from the mistake log and builds a lesson plus quiz per topic, drawn from your own logged mistakes. **Learn** teaches the next new topic from the weekly syllabus, one per week. Either way the skill writes the session into the dashboard and opens it there, explaining each answer by contrast with your native language when one is configured. Every session stays in the list, so you can reread a lesson or retake its quiz later, and each attempt's score is kept. The quiz is fully keyboard-driven: number keys or arrow keys pick an answer, Enter checks it, Esc returns to the lessons and again to the session list. Sessions built before the dashboard existed are standalone HTML files under `~/.claude/cc-grammar-coach/drills/`; the list does not index them, so open those from the file manager if you still want them.
 
 <p align="center">
   <img src="docs/img/quiz-correct.png" width="49%" alt="A choice question answered correctly, with the rule explained">
@@ -59,6 +65,7 @@ Ask in plain language ("give me a grammar drill", "quiz me on my mistakes", "let
 ## Requirements
 
 - `bash`, `python3`, and `curl`.
+- A web browser and a free localhost port for the dashboard (8437 by default, `GRAMMAR_DASHBOARD_PORT` overrides it).
 - An OpenAI-compatible chat-completions endpoint for the grammar model.
 - Linux or macOS.
 

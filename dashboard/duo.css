@@ -85,20 +85,6 @@
 
 /* ---------- page frame ---------- */
 
-.duo-page {
-  min-height: 100vh;
-  margin: 0;
-  padding: var(--duo-space-4);
-  display: grid;
-  place-items: center;
-  background: var(--duo-bg);
-  color: var(--duo-text);
-  font-family: var(--duo-font);
-  font-size: var(--duo-text-md);
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-
 /* The lesson frame: header, scrolling body, fixed footer. The footer's height
    never varies, which is what keeps its button anchored between screens. */
 .duo-shell {
@@ -182,7 +168,6 @@
   cursor: default;
 }
 
-.duo-btn--info { --duo-btn-fill: var(--duo-info); --duo-btn-shadow: var(--duo-info-shadow); }
 .duo-btn--danger { --duo-btn-fill: var(--duo-danger); --duo-btn-shadow: var(--duo-danger-shadow); }
 
 .duo-btn--ghost {
@@ -194,7 +179,6 @@
 .duo-btn--ghost:active:not(:disabled) { transform: none; }
 
 .duo-btn--wide { min-width: 192px; }
-.duo-btn--block { width: 100%; }
 
 .duo-icon-btn {
   flex: none;
@@ -400,7 +384,6 @@
 .duo-stack { display: flex; flex-direction: column; gap: var(--duo-space-2); }
 .duo-stack--tight { gap: var(--duo-space-1); }
 .duo-stack--loose { gap: var(--duo-space-3); }
-.duo-divider { border: none; border-top: var(--duo-stroke) solid var(--duo-border); margin: 0; }
 .duo-hidden { display: none !important; }
 
 @media (max-width: 560px) {

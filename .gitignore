@@ -6,7 +6,7 @@ test-home/
 # Backups
 *.bak-*
 
-# Generated drill pages
+# Authored drill and lesson data
 drills/
 
 # Python

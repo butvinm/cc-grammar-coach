@@ -19,10 +19,12 @@ from urllib.parse import unquote
 from urllib.request import urlopen
 
 APP = "cc-grammar-coach"
+# Kept in step with .claude-plugin/plugin.json by hand - that manifest is the source of truth, and the launcher's version-skew notice compares this constant against the running server's. See the release step in CONTRIBUTING.md.
 VERSION = "0.6.0"
 APP_DIR = Path(__file__).resolve().parent
 GRAMMAR_HOME = Path(os.environ.get("GRAMMAR_HOME", Path.home() / ".claude" / "cc-grammar-coach"))
 HOST_RE = re.compile(r"^(127\.0\.0\.1|localhost)(:\d+)?$")
+TS_RE = re.compile(r"^\d{4}-\d\d-\d\d")
 
 
 def read_jsonl(path: Path) -> list:
@@ -70,7 +72,7 @@ def is_int(v) -> bool:
 def valid_result(obj) -> bool:
     if not isinstance(obj, dict) or set(obj) != {"ts", "drill", "total", "correct", "byTopic"}:
         return False
-    if not isinstance(obj["ts"], str):
+    if not isinstance(obj["ts"], str) or not TS_RE.match(obj["ts"]):
         return False
     drill = obj["drill"]
     if not isinstance(drill, str) or drill != os.path.basename(drill) or not drill.endswith(".json"):
@@ -79,12 +81,16 @@ def valid_result(obj) -> bool:
         return False
     if not is_int(obj["total"]) or not is_int(obj["correct"]):
         return False
+    if not 0 <= obj["correct"] <= obj["total"]:
+        return False
     if not isinstance(obj["byTopic"], dict):
         return False
     for v in obj["byTopic"].values():
         if not isinstance(v, dict) or set(v) != {"good", "total"}:
             return False
         if not is_int(v["good"]) or not is_int(v["total"]):
+            return False
+        if not 0 <= v["good"] <= v["total"]:
             return False
     return True
 
@@ -121,7 +127,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/duo.css":
             return self.send_app_file("duo.css", "text/css; charset=utf-8")
         if path == "/api/health":
-            return self.send_json({"app": APP, "version": VERSION})
+            return self.send_json({"app": APP, "version": VERSION, "home": str(GRAMMAR_HOME)})
         if path == "/api/history":
             return self.send_json(read_jsonl(GRAMMAR_HOME / "history.jsonl"))
         if path == "/api/results":
@@ -134,14 +140,24 @@ class Handler(BaseHTTPRequestHandler):
                 p = GRAMMAR_HOME / "drills" / name
                 try:
                     return self.send_json(json.loads(p.read_text(encoding="utf-8")))
-                except (OSError, json.JSONDecodeError):
+                except (OSError, ValueError):
                     pass
             return self.send_json({"error": "not found"}, 404)
         return self.send_json({"error": "not found"}, 404)
 
+    def cross_site(self) -> bool:
+        # The Host allowlist stops DNS rebinding but not a plain cross-origin POST, whose Host header is honestly 127.0.0.1. A page on any site can submit a form or a simple fetch here, so the one write endpoint also demands a same-origin marker: an application/json body (cross-origin that needs a preflight this server never answers) and, when the browser sends one, a local Origin.
+        ctype = self.headers.get("Content-Type", "").split(";", 1)[0].strip().lower()
+        if ctype != "application/json":
+            return True
+        origin = self.headers.get("Origin")
+        return bool(origin) and not HOST_RE.match(origin.split("//", 1)[-1])
+
     def do_POST(self) -> None:
         if not self.host_ok():
             return self.send_json({"error": "forbidden host"}, 403)
+        if self.cross_site():
+            return self.send_json({"error": "forbidden origin"}, 403)
         if self.path.split("?", 1)[0] != "/api/results":
             return self.send_json({"error": "not found"}, 404)
         try:
@@ -176,24 +192,33 @@ def main() -> None:
     parser.add_argument("--url-path", default="", metavar="HASH", help='hash route to open, e.g. "#progress"')
     args = parser.parse_args()
 
-    port = int(os.environ.get("GRAMMAR_DASHBOARD_PORT", "8437"))
+    raw_port = os.environ.get("GRAMMAR_DASHBOARD_PORT", "8437")
+    if not raw_port.isdigit() or not 1 <= int(raw_port) <= 65535:
+        print(f"GRAMMAR_DASHBOARD_PORT is {raw_port!r}, which is not a port number; set GRAMMAR_DASHBOARD_PORT to a free port between 1 and 65535 and relaunch", file=sys.stderr)
+        sys.exit(1)
+    port = int(raw_port)
     url = f"http://127.0.0.1:{port}/{args.url_path}"
     running = probe(port)
     if isinstance(running, dict):
+        home = running.get("home")
+        if home != str(GRAMMAR_HOME):
+            print(f"port {port} is held by a dashboard serving {home or 'an unknown grammar home'}, not {GRAMMAR_HOME}; stop that server or set GRAMMAR_DASHBOARD_PORT to a free port and relaunch", file=sys.stderr)
+            sys.exit(1)
         if running.get("version") != VERSION:
-            print(f"dashboard already running at {url} with version {running.get('version')} (local copy is {VERSION}); stop it with Ctrl+C and relaunch to pick up the update")
+            print(f"dashboard already running at {url} with version {running.get('version')} (local copy is {VERSION}); stop it (Ctrl+C in its terminal, or pkill -f dashboard/server.py) and relaunch to pick up the update")
         else:
             print(f"dashboard already running at {url}")
         if not args.no_open:
             webbrowser.open(url)
         sys.exit(0)
+    busy = f"port {port} is in use by another program; set GRAMMAR_DASHBOARD_PORT to a free port and relaunch"
     if running == "foreign":
-        print(f"port {port} is in use by another program; set GRAMMAR_DASHBOARD_PORT to a free port and relaunch", file=sys.stderr)
+        print(busy, file=sys.stderr)
         sys.exit(1)
     try:
         server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    except OSError as exc:
-        print(f"cannot bind 127.0.0.1:{port} ({exc}); set GRAMMAR_DASHBOARD_PORT to a free port", file=sys.stderr)
+    except OSError:
+        print(busy, file=sys.stderr)
         sys.exit(1)
     print(f"serving the {APP} dashboard at {url} (Ctrl+C to stop)", flush=True)
     if not args.no_open:

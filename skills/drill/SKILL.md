@@ -1,11 +1,11 @@
 ---
 name: drill
-description: Build a personalized English grammar lesson and interactive quiz as a local web page from the grammar-check hook's mistake log. Invoke when the user asks for a grammar drill, quiz, or practice on their mistakes.
+description: Build a personalized English grammar lesson and interactive quiz in the local dashboard from the grammar-check hook's mistake log. Invoke when the user asks for a grammar drill, quiz, or practice on their mistakes.
 ---
 
 # Drill
 
-Turn the mistakes logged by the grammar-check hook into a lesson-plus-quiz web page grounded in the user's own sentences.
+Turn the mistakes logged by the grammar-check hook into a lesson-plus-quiz dashboard session grounded in the user's own sentences.
 
 The user's native language is `${user_config.native_language}`. When it is set, contrast English rules with the habits that language causes (for example a language with no articles, freer word order, or aspect instead of tense variety). When it is empty, give generic English lessons and do not assume any nationality.
 
@@ -85,7 +85,7 @@ Use it two ways: `fixes[].category` ranks recent weak spots, and a line's presen
    python3 "${CLAUDE_PLUGIN_ROOT}/skills/drill/scripts/prepare_drill.py" --kind drill <data.json>
    ```
 
-   The script validates the data, stamps `"kind": "drill"`, writes `$GRAMMAR_HOME/drills/drill-<date>-<HHMM>.json`, and prints that file name. It writes nothing when validation fails, so fix the reported error and rerun.
+   The script validates the data, stamps `"kind": "drill"` and today's date, writes `$GRAMMAR_HOME/drills/drill-<date>-<HHMMSS>.json`, and prints that file name - pass the printed name to the next step, never a reconstructed one. It writes nothing when validation fails, so fix the reported error and rerun.
 
 5. Open the drill in the dashboard, passing the printed file name as the hash route:
 
@@ -94,13 +94,13 @@ Use it two ways: `fixes[].category` ranks recent weak spots, and a line's presen
    python3 "$GRAMMAR_HOME/dashboard/server.py" --url-path "#drill=<file>"
    ```
 
-   Launch it with the Bash tool's background mode - the server serves until interrupted, so a foreground call would hang the skill. It prints the URL it serves at, opens the browser itself, and exits immediately when a dashboard is already running on the port. If `$GRAMMAR_HOME/dashboard/server.py` does not exist yet (the checker hook copies it there on the first message of a session and may not have run), launch `${CLAUDE_PLUGIN_ROOT}/dashboard/server.py` instead this once and say so in the reply.
+   Launch it with the Bash tool's background mode - the server serves until interrupted, so a foreground call would hang the skill. It prints the URL it serves at, opens the browser itself, and exits immediately when a dashboard is already running on the port. If `$GRAMMAR_HOME/dashboard/server.py` does not exist (the checker hook copies it there on every message, so this only happens when that hook has not run at all), launch `${CLAUDE_PLUGIN_ROOT}/dashboard/server.py` instead this once and say so in the reply.
 
-   Read the launcher's output before replying - it has four outcomes and only the first two mean the page is usable:
+   Background mode returns no output in the tool result, so poll the launch with `BashOutput` until it has printed a line, and read that line before replying - it has four outcomes and only the first two mean the page is usable:
    - `serving the cc-grammar-coach dashboard at <url>` - it started; reply with the template below.
    - `dashboard already running at <url>` - an identical server was already up; reply with the template below.
-   - `dashboard already running at <url> with version <v> ... stop it with Ctrl+C and relaunch to pick up the update` - a server from an older plugin version holds the port and will serve the old dashboard. Relay that whole sentence instead of the plain URL line, so the user knows to restart it.
-   - a nonzero exit (`port <n> is in use by another program ...` or `cannot bind ...`) - a foreign program holds the port. Relay the message and stop; do not report a URL, it would point at that program, not at the drill.
+   - `dashboard already running at <url> with version <v> ... stop it (Ctrl+C in its terminal, or pkill -f dashboard/server.py) and relaunch to pick up the update` - a server from an older plugin version holds the port and will serve the old dashboard. Relay that whole sentence instead of the plain URL line, so the user knows to restart it.
+   - a nonzero exit - the port cannot serve this dashboard: a foreign program holds it, a dashboard on it serves a different grammar home, or `GRAMMAR_DASHBOARD_PORT` is not a port number. Relay the message and stop; do not report a URL, it would point at something other than the drill.
 
 6. Reply with exactly this template, using the URL the server printed:
 

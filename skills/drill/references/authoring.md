@@ -14,7 +14,6 @@ Use plain ASCII punctuation in all generated text (straight quotes, hyphens, thr
 
 ```json
 {
-  "date": "2026-07-15",
   "topics": [
     {
       "id": "articles",
@@ -55,6 +54,6 @@ Use plain ASCII punctuation in all generated text (straight quotes, hyphens, thr
 }
 ```
 
-Do not author a `kind` key: `prepare_drill.py` stamps it from its `--kind` flag (`drill` or `learn`), which is fixed per skill, and overwrites anything already there.
+Do not author `kind` or `date`: `prepare_drill.py` stamps `kind` from its `--kind` flag (`drill` or `learn`), which is fixed per skill, and `date` from the clock, and it overwrites anything already there. The file name is built from the same clock, so an authored date could name any file and order the dashboard list wrong.
 
 `topic` must match a topic `id`. `answer` is a 0-based index into `options`. `answers` lists every acceptable rewrite; comparison ignores only case, extra spaces, and end punctuation, so enumerate variants yourself - contraction and full forms (We've / We have), and each valid article or tense choice.

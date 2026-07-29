@@ -3,7 +3,7 @@
 
 Usage: prepare_drill.py --kind drill|learn <data.json>
 
-Validates the authored data, stamps the `kind` badge the dashboard shows, writes the result to $GRAMMAR_HOME/drills/drill-<date>-<HHMM>.json (GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach) and prints the file name. A session prepared in a minute that already has a file gets seconds appended (drill-<date>-<HHMMSS>.json) so two sessions never overwrite each other; the file is created with exclusive open, so concurrent runs cannot both claim one name. Nothing is written when validation fails. The dashboard reads the file over its /api/drills endpoints, so opening it is the launcher's job. Stdlib only.
+Validates the authored data, stamps the `kind` badge the dashboard shows and the `date` the dashboard displays, writes the result to $GRAMMAR_HOME/drills/drill-<date>-<HHMMSS>.json (GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach) and prints the file name. Both stamps come from the script, not from the authored data: the file name is a path component and the dashboard sorts sessions by it, so an authored date could name any file and order the list wrong. Seconds in the name keep every name the same length, so the lexical sort the dashboard does is chronological. The file is created with an exclusive open, so two runs never overwrite each other. Nothing is written when validation fails. The dashboard reads the file over its /api/drills endpoints, so opening it is the launcher's job. Stdlib only.
 """
 
 import argparse
@@ -71,27 +71,24 @@ def main() -> None:
         fail(f"cannot read drill data: {exc}")
     if not isinstance(data, dict):
         fail("drill data must be a JSON object")
-    data.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
     validate(data)
+    stamp = datetime.now()
     data["kind"] = args.kind
+    data["date"] = f"{stamp:%Y-%m-%d}"
 
     home = Path(os.environ.get("GRAMMAR_HOME", Path.home() / ".claude" / "cc-grammar-coach"))
     out_dir = home / "drills"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now()
-    prefix = f"drill-{data['date']}-{stamp:%H%M}"
-    candidates = [f"{prefix}.json", f"{prefix}{stamp:%S}.json"]
-    candidates += [f"{prefix}{stamp:%S}-{n}.json" for n in range(2, 100)]
+    name = f"drill-{stamp:%Y-%m-%d-%H%M%S}.json"
     body = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
-    for name in candidates:
-        try:
-            with open(out_dir / name, "x", encoding="utf-8") as f:
-                f.write(body)
-        except FileExistsError:
-            continue
-        print(name)
-        return
-    fail(f"every candidate name for {prefix} is taken in {out_dir}")
+    try:
+        out_dir.mkdir(parents=True, exist_ok=True)
+        with open(out_dir / name, "x", encoding="utf-8") as f:
+            f.write(body)
+    except FileExistsError:
+        fail(f"{name} already exists in {out_dir}, so this second already has a session; wait a second and rerun to get a fresh name")
+    except OSError as exc:
+        fail(f"cannot write {out_dir / name}: {exc}")
+    print(name)
 
 
 if __name__ == "__main__":

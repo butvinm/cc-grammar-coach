@@ -323,7 +323,9 @@ body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
 
 <script>
 const $ = id => document.getElementById(id);
-const esc = s => { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; };
+// textContent/innerHTML escapes & < > but leaves quotes, and one call site (the
+// session card's data-file) interpolates into an attribute, so quotes go too.
+const esc = s => { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML.replace(/"/g, '&quot;'); };
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -412,11 +414,13 @@ const topicLabel = id => (DATA.topics.find(t => t.id === id) || { label: id }).l
 
 async function loadLastResult(file) {
   try {
-    return (await fetchJSON('/api/results')).filter(r => r && r.drill === file).pop() || null;
+    return lastResultByDrill(await fetchJSON('/api/results')).get(file) || null;
   } catch (e) {
     return null;
   }
 }
+
+const usableDrill = d => !!d && typeof d === 'object' && Array.isArray(d.topics) && Array.isArray(d.questions) && d.questions.length > 0;
 
 async function showDrill(file) {
   wantedFile = file;
@@ -430,6 +434,9 @@ async function showDrill(file) {
     return;
   }
   if (wantedFile !== file) return;
+  // A hand-edited or older-format file parses but has no screens to render, and
+  // the quiz machine would throw mid-render leaving a dead shell behind.
+  if (!usableDrill(data)) return showDrillError(file, { status: 422 });
   DATA = data; loadedFile = file; lastResult = prev;
   $('drillError').classList.add('duo-hidden');
   $('drillShell').classList.remove('duo-hidden');
@@ -442,10 +449,13 @@ function showDrillError(file, err) {
   $('drillShell').classList.add('duo-hidden');
   const pane = $('drillError');
   pane.classList.remove('duo-hidden');
+  const missing = err.status === 404;
   pane.innerHTML = err.status
-    ? `<div class="duo-card duo-stack" data-state="drill-missing">
-        <h2 class="duo-heading">Drill not found</h2>
-        <p style="margin: 0">The server has no drill named ${esc(file)}.</p>
+    ? `<div class="duo-card duo-stack" data-state="${missing ? 'drill-missing' : 'drill-unreadable'}">
+        <h2 class="duo-heading">${missing ? 'Drill not found' : 'Drill unreadable'}</h2>
+        <p style="margin: 0">${missing
+          ? `The server has no drill named ${esc(file)}.`
+          : `${esc(file)} is not a drill this dashboard can open - it has no topics or no questions.`}</p>
         <button class="duo-btn duo-btn--ghost" data-back>Back to drills</button>
       </div>`
     : serverGoneMarkup();
@@ -488,11 +498,11 @@ function renderLessons() {
  * top edge, not the whole viewport: the tab bar sits above it.
  */
 
-function screenMarkup(el, inner) {
-  const c = el.cloneNode(inner === undefined);
+function screenMarkup(screen, inner) {
+  const c = screen.cloneNode(false);
   c.removeAttribute('id');
   c.classList.remove('duo-hidden');
-  if (inner !== undefined) c.innerHTML = inner;
+  c.innerHTML = inner;
   return c.outerHTML;
 }
 
@@ -761,24 +771,26 @@ $('actionBtn').onclick = () => {
 };
 
 /* Key handling is document-level and dereferences quiz-only nodes, so every
-   handler is gated on the quiz view owning the screen with a drill loaded:
-   on the list and progress views the keys must be inert. */
-const quizActive = () => document.body.dataset.view === 'drill' && !!DATA;
+   handler is gated on the drill view owning the screen, and everything past Esc
+   also on a drill being loaded: on the list and progress views the keys must be
+   inert, and on the drill view's error panes only Esc still steps back. */
+const drillView = () => document.body.dataset.view === 'drill';
 
 document.addEventListener('keyup', e => { if (e.key === 'Enter') enterLocked = false; });
 document.addEventListener('keydown', e => {
-  if (!quizActive()) return;
+  if (!drillView()) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    // One step back per press: quiz or result -> this drill's lessons, lessons -> the list.
+    if (!DATA || phase === 'start') location.hash = '#drills';
+    else toLessons();
+    return;
+  }
+  if (!DATA) return;
   if (e.key === 'Enter') {
     if (enterLocked || $('actionBtn').disabled) return;
     e.preventDefault();
     $('actionBtn').click();
-    return;
-  }
-  if (e.key === 'Escape') {
-    e.preventDefault();
-    // One step back per press: quiz or result -> this drill's lessons, lessons -> the list.
-    if (phase === 'start') location.hash = '#drills';
-    else toLessons();
     return;
   }
   // Selection keys act only while a choice question awaits an answer; rewrite
@@ -798,7 +810,13 @@ document.addEventListener('keydown', e => {
 
 // Again once fonts and layout have settled: the first pass can measure short.
 window.addEventListener('load', fit);
-window.addEventListener('resize', fit);
+// fit() measures every question by cloning it into the live DOM, so a drag of the
+// window edge would otherwise force a layout per question per resize event.
+let fitTimer = 0;
+window.addEventListener('resize', () => {
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(fit, 150);
+});
 
 /* ---------- progress: aggregation ----------
  * Ported from the standalone progress builder this view replaces. Dates are the ones the ts string
@@ -1038,8 +1056,13 @@ function renderProgress() {
 function route() {
   const h = location.hash;
   let view = 'drills', arg = null;
-  if (h.startsWith('#drill=')) { view = 'drill'; arg = decodeURIComponent(h.slice('#drill='.length)); }
-  else if (h === '#progress') view = 'progress';
+  if (h.startsWith('#drill=')) {
+    const raw = h.slice('#drill='.length);
+    // A hand-typed hash can hold a broken escape; decoding it must not abort the
+    // router, or the page would silently keep whatever view it had.
+    try { arg = decodeURIComponent(raw); } catch (e) { arg = raw; }
+    if (arg) view = 'drill';
+  } else if (h === '#progress') view = 'progress';
   document.body.dataset.view = view;
   ['drills', 'drill', 'progress'].forEach(v => $('view-' + v).classList.toggle('duo-hidden', v !== view));
   $('tab-drills').classList.toggle('is-active', view !== 'progress');
