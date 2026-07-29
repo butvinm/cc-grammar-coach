@@ -5,12 +5,12 @@
     "name": "Mikhail Butvin",
     "url": "https://github.com/butvinm"
   },
-  "description": "The cc-grammar-coach plugin: an out-of-band English grammar checker with mistake-driven drill, learn, and progress skills, installable as a Claude Code plugin.",
+  "description": "The cc-grammar-coach plugin: an out-of-band English grammar checker with mistake-driven drill, learn, and progress skills feeding a local dashboard, installable as a Claude Code plugin.",
   "plugins": [
     {
       "name": "cc-grammar-coach",
       "source": "./",
-      "description": "Out-of-band English grammar checker (UserPromptSubmit hook) that logs your mistakes and shows optional statusline feedback, plus drill, learn, and progress skills that turn the log into lesson-and-quiz web pages and a mistake-frequency chart.",
+      "description": "Out-of-band English grammar checker (UserPromptSubmit hook) that logs your mistakes and shows optional statusline feedback, plus drill, learn, and progress skills that feed a local dashboard with lesson-and-quiz sessions and a mistake-frequency chart.",
       "license": "MIT",
       "keywords": ["grammar", "english", "language-learning", "writing", "hook", "statusline", "education"]
     }

@@ -5,31 +5,28 @@ description: Render a local web page charting grammar mistake frequency by categ
 
 # Progress
 
-Chart the mistake log over time: a column chart of all mistakes, a small-multiple panel per category, and a table view. The page is deterministic - nothing is authored; build it and open it.
+Chart the mistake log over time: a column chart of all mistakes, a small-multiple panel per category, and a table view. Nothing is authored and nothing is built - the dashboard reads `$GRAMMAR_HOME/history.jsonl` and computes the whole view when the page loads, so this skill only opens it on the progress route.
 
 To practice the logged mistakes instead of charting them, use the `drill` skill; to learn a new topic, use the `learn` skill.
 
-1. Run the builder:
+1. Resolve grammar home (it defaults to `~/.claude/cc-grammar-coach` and is overridden by `$GRAMMAR_HOME`) and open the dashboard on the progress view:
 
    ```
-   python3 "${CLAUDE_PLUGIN_ROOT}/skills/progress/scripts/build_progress.py"
+   GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
    ```
 
-   It reads `$GRAMMAR_HOME/history.jsonl` (`GRAMMAR_HOME` defaults to `~/.claude/cc-grammar-coach`), aggregates every logged fix into day, week, or month buckets depending on the log's span, writes `$GRAMMAR_HOME/progress.html` - overwritten on every run, the page is a pure function of the log - and prints the output path followed by a one-line summary. If it fails with "no dated mistakes", relay that message instead of fabricating a page.
-
-2. Open the printed path portably - `open` on macOS, `xdg-open` on Linux, and if neither exists just report the path:
-
    ```
-   if command -v open >/dev/null 2>&1; then open "<path>"
-   elif command -v xdg-open >/dev/null 2>&1; then xdg-open "<path>"
-   else echo "Open this in a browser: <path>"; fi
+   python3 "$GRAMMAR_HOME/dashboard/server.py" --url-path "#progress"
    ```
 
-3. Reply with exactly this template, quoting the two lines the builder printed:
+   Launch it with the Bash tool's background mode - the server serves until interrupted, so a foreground call would hang the skill. It prints the URL it serves at, opens the browser itself, and exits immediately when a dashboard is already running on the port. If `$GRAMMAR_HOME/dashboard/server.py` does not exist yet (the checker hook copies it there on the first message of a session and may not have run), launch `${CLAUDE_PLUGIN_ROOT}/dashboard/server.py` instead this once and say so in the reply.
+
+2. Reply with exactly this template, using the URL the server printed:
 
    ```
-   Progress page ready: <output path>
-   <summary line>
+   Progress ready: http://127.0.0.1:<port>/#progress
    ```
 
-The counts are raw flagged mistakes: a day with more written English naturally shows more of them, so a spike means volume, not regression. The page states this caveat in its footer; do not editorialize about trends beyond it.
+   The page states its own counts; do not read the log yourself to summarize them in the reply.
+
+The counts are raw flagged mistakes: a day with more written English naturally shows more of them, so a spike means volume, not regression. The page states this caveat in its footer; do not editorialize about trends beyond it. When the log holds no dated mistakes the page says so itself - relay that rather than fabricating numbers.
