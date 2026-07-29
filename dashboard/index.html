@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grammar Coach</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="duo.css">
+<style>
+/* Page-specific composition. Anything reusable belongs in duo.css instead. */
+* { box-sizing: border-box; }
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  padding: var(--duo-space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--duo-space-4);
+  background: var(--duo-bg);
+  color: var(--duo-text);
+  font-family: var(--duo-font);
+  font-size: var(--duo-text-md);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.topbar {
+  width: 100%;
+  max-width: var(--duo-shell-width);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--duo-space-3);
+  flex-wrap: wrap;
+}
+
+.brand { font-size: var(--duo-text-lg); font-weight: var(--duo-weight-heavy); }
+
+.tabs { display: flex; gap: var(--duo-space-2); }
+
+.tab {
+  font-size: var(--duo-text-sm);
+  font-weight: var(--duo-weight-heavy);
+  text-transform: uppercase;
+  letter-spacing: var(--duo-tracking);
+  color: var(--duo-text-muted);
+  text-decoration: none;
+  padding: var(--duo-space-1) var(--duo-space-3);
+  border-radius: var(--duo-radius-pill);
+}
+.tab:hover { color: var(--duo-text); }
+.tab.is-active { color: var(--duo-info-ink); background: var(--duo-info-soft); }
+.tab:focus-visible { outline: 3px solid var(--duo-info); outline-offset: 2px; }
+
+/* Per-view layout: the list and progress views flow top-down under the tab bar;
+   only the quiz view centers its fixed-height card in the leftover viewport
+   (the place-items trap from PR #24 - centering must never grab tall flows). */
+.view { width: 100%; max-width: var(--duo-shell-width); }
+body[data-view="drill"] .view { flex: 1; display: grid; place-items: center; }
+
+.session {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--duo-text);
+  background: var(--duo-surface);
+  border: var(--duo-stroke) solid var(--duo-border);
+  border-bottom-width: var(--duo-lift);
+  border-radius: var(--duo-radius-lg);
+  padding: var(--duo-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--duo-space-2);
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.session:hover { background: var(--duo-info-soft); }
+.session:focus-visible { outline: 3px solid var(--duo-info); outline-offset: 2px; }
+
+.session__top { display: flex; align-items: center; gap: var(--duo-space-2); flex-wrap: wrap; }
+.session__date { font-weight: var(--duo-weight-bold); }
+.session__score { margin-left: auto; font-weight: var(--duo-weight-heavy); color: var(--duo-brand-ink); }
+
+.kind {
+  font-size: var(--duo-text-xs);
+  font-weight: var(--duo-weight-heavy);
+  text-transform: uppercase;
+  letter-spacing: var(--duo-tracking);
+  border-radius: var(--duo-radius-pill);
+  padding: var(--duo-space-1) var(--duo-space-2);
+}
+.kind--drill { color: var(--duo-brand-ink); background: var(--duo-brand-soft); }
+.kind--learn { color: var(--duo-info-ink); background: var(--duo-info-soft); }
+
+.cmd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: var(--duo-text-sm);
+  background: var(--duo-bg);
+  border: var(--duo-stroke) solid var(--duo-border);
+  border-radius: var(--duo-radius-sm);
+  padding: var(--duo-space-2) var(--duo-space-3);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+</style>
+</head>
+<body data-view="drills">
+
+<header class="topbar">
+  <div class="brand">Grammar Coach</div>
+  <nav class="tabs" aria-label="Views">
+    <a class="tab is-active" id="tab-drills" href="#drills">Drills</a>
+    <a class="tab" id="tab-progress" href="#progress">Progress</a>
+  </nav>
+</header>
+
+<main class="view" id="view-drills">
+  <div class="duo-stack duo-stack--loose" id="drillsList"></div>
+</main>
+
+<main class="view duo-hidden" id="view-drill">
+  <div class="duo-card duo-stack" id="drillPane"></div>
+</main>
+
+<main class="view duo-hidden" id="view-progress">
+  <div class="duo-card duo-stack" id="progressPane">
+    <h2 class="duo-heading">Progress</h2>
+    <p class="duo-muted" style="margin: 0">The chart view lands here in an upcoming update.</p>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; };
+const RESTART_CMD = 'python3 $GRAMMAR_HOME/dashboard/server.py';
+
+async function fetchJSON(url) {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`${url}: ${resp.status}`);
+  return resp.json();
+}
+
+function serverGoneMarkup() {
+  return `<div class="duo-card duo-stack" data-state="server-gone">
+    <h2 class="duo-heading">Server gone</h2>
+    <p style="margin: 0">The dashboard server is not answering. Restart it from a terminal, then reload this page:</p>
+    <div class="cmd">${RESTART_CMD}</div>
+  </div>`;
+}
+
+/* ---------- drills list ---------- */
+
+function lastResultByDrill(results) {
+  const map = new Map();
+  results.forEach(r => { if (r && typeof r.drill === 'string') map.set(r.drill, r); });
+  return map;
+}
+
+function sessionCard(d, last) {
+  const kind = d.kind === 'learn' ? 'learn' : 'drill';
+  const chips = (d.topics || []).map(t =>
+    `<span class="duo-chip">${esc(t.label ?? '?')} &middot; ${t.count ? t.count + ' logged' : 'new topic'}</span>`).join('');
+  const score = last ? `<span class="session__score">${last.correct} / ${last.total}</span>` : '';
+  return `<button class="session" data-file="${esc(d.file)}">
+    <div class="session__top">
+      <span class="kind kind--${kind}">${kind}</span>
+      <span class="session__date">${esc(d.date || d.file)}</span>
+      ${score}
+    </div>
+    <div class="duo-row">${chips}</div>
+  </button>`;
+}
+
+async function loadDrills() {
+  const list = $('drillsList');
+  let drills, results;
+  try {
+    [drills, results] = await Promise.all([fetchJSON('/api/drills'), fetchJSON('/api/results')]);
+  } catch (e) {
+    list.innerHTML = serverGoneMarkup();
+    return;
+  }
+  if (!drills.length) {
+    list.innerHTML = `<div class="duo-card duo-stack" data-state="empty">
+      <h2 class="duo-heading">No drills yet</h2>
+      <p class="duo-muted" style="margin: 0">Authored drills and lessons will show up here. Ask Claude for a grammar drill or a new lesson to create the first one.</p>
+    </div>`;
+    return;
+  }
+  const lasts = lastResultByDrill(results);
+  list.innerHTML = drills.map(d => sessionCard(d, lasts.get(d.file))).join('');
+}
+
+$('drillsList').addEventListener('click', e => {
+  const card = e.target.closest('.session');
+  if (card) location.hash = '#drill=' + encodeURIComponent(card.dataset.file);
+});
+
+/* ---------- drill view (quiz port lands here) ---------- */
+
+function showDrill(file) {
+  $('drillPane').innerHTML = `<h2 class="duo-heading">${esc(file)}</h2>
+    <p class="duo-muted" style="margin: 0">The quiz view lands here in an upcoming update.</p>
+    <button class="duo-btn duo-btn--ghost" onclick="location.hash = '#drills'">Back to drills</button>`;
+}
+
+/* ---------- hash router ---------- */
+
+function route() {
+  const h = location.hash;
+  let view = 'drills', arg = null;
+  if (h.startsWith('#drill=')) { view = 'drill'; arg = decodeURIComponent(h.slice('#drill='.length)); }
+  else if (h === '#progress') view = 'progress';
+  document.body.dataset.view = view;
+  ['drills', 'drill', 'progress'].forEach(v => $('view-' + v).classList.toggle('duo-hidden', v !== view));
+  $('tab-drills').classList.toggle('is-active', view !== 'progress');
+  $('tab-progress').classList.toggle('is-active', view === 'progress');
+  if (view === 'drills') loadDrills();
+  else if (view === 'drill') showDrill(arg);
+}
+
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>
