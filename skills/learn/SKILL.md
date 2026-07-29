@@ -13,7 +13,7 @@ To practice the user's logged mistakes instead of teaching new material, use the
 
 ## Where the data lives
 
-Grammar home defaults to `~/.claude/cc-grammar-coach` and is overridden by `$GRAMMAR_HOME`. Resolve it once:
+Grammar home defaults to `~/.claude/cc-grammar-coach` and is overridden by `$GRAMMAR_HOME`. Bash tool calls do not share shell state, so it is resolved inside every command that needs it, never in a call of its own:
 
 ```
 GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
@@ -45,15 +45,28 @@ GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 6. Open the lesson in the dashboard, passing the printed file name as the hash route:
 
    ```
+   GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
    python3 "$GRAMMAR_HOME/dashboard/server.py" --url-path "#drill=<file>"
    ```
 
    Launch it with the Bash tool's background mode - the server serves until interrupted, so a foreground call would hang the skill. It prints the URL it serves at, opens the browser itself, and exits immediately when a dashboard is already running on the port. If `$GRAMMAR_HOME/dashboard/server.py` does not exist yet (the checker hook copies it there on the first message of a session and may not have run), launch `${CLAUDE_PLUGIN_ROOT}/dashboard/server.py` instead this once and say so in the reply.
 
-7. Reply with exactly this template, using the URL the server printed and picking `New topic` or `Review` to match step 2:
+   Read the launcher's output before replying - it has four outcomes and only the first two mean the page is usable:
+   - `serving the cc-grammar-coach dashboard at <url>` - it started; reply with the template below.
+   - `dashboard already running at <url>` - an identical server was already up; reply with the template below.
+   - `dashboard already running at <url> with version <v> ... stop it with Ctrl+C and relaunch to pick up the update` - a server from an older plugin version holds the port and will serve the old dashboard. Relay that whole sentence instead of the plain URL line, so the user knows to restart it.
+   - a nonzero exit (`port <n> is in use by another program ...` or `cannot bind ...`) - a foreign program holds the port. Relay the message and stop; do not report a URL, it would point at that program, not at the lesson.
+
+7. Reply with exactly this template, using the URL the server printed. The dashboard titles the page "New Lesson", so the reply says lesson, not drill:
 
    ```
-   Drill ready: http://127.0.0.1:<port>/#drill=<file>
+   Lesson ready: http://127.0.0.1:<port>/#drill=<file>
    New topic: <label> (<iso-week>)
    Questions: <total count>
+   ```
+
+   When step 2 found a line for the current week and this is that week's review rather than a new topic, keep the same three lines and swap the middle one for:
+
+   ```
+   Review: <label> (<iso-week>)
    ```

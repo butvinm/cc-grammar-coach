@@ -3,7 +3,7 @@
 
 Usage: prepare_drill.py --kind drill|learn <data.json>
 
-Validates the authored data, stamps the `kind` badge the dashboard shows, writes the result to $GRAMMAR_HOME/drills/drill-<date>-<HHMM>.json (GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach) and prints the file name. Nothing is written when validation fails. The dashboard reads the file over its /api/drills endpoints, so opening it is the launcher's job. Stdlib only.
+Validates the authored data, stamps the `kind` badge the dashboard shows, writes the result to $GRAMMAR_HOME/drills/drill-<date>-<HHMM>.json (GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach) and prints the file name. A session prepared in a minute that already has a file gets seconds appended (drill-<date>-<HHMMSS>.json) so two sessions never overwrite each other; the file is created with exclusive open, so concurrent runs cannot both claim one name. Nothing is written when validation fails. The dashboard reads the file over its /api/drills endpoints, so opening it is the launcher's job. Stdlib only.
 """
 
 import argparse
@@ -78,9 +78,20 @@ def main() -> None:
     home = Path(os.environ.get("GRAMMAR_HOME", Path.home() / ".claude" / "cc-grammar-coach"))
     out_dir = home / "drills"
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"drill-{data['date']}-{datetime.now().strftime('%H%M')}.json"
-    out.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(out.name)
+    stamp = datetime.now()
+    prefix = f"drill-{data['date']}-{stamp:%H%M}"
+    candidates = [f"{prefix}.json", f"{prefix}{stamp:%S}.json"]
+    candidates += [f"{prefix}{stamp:%S}-{n}.json" for n in range(2, 100)]
+    body = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
+    for name in candidates:
+        try:
+            with open(out_dir / name, "x", encoding="utf-8") as f:
+                f.write(body)
+        except FileExistsError:
+            continue
+        print(name)
+        return
+    fail(f"every candidate name for {prefix} is taken in {out_dir}")
 
 
 if __name__ == "__main__":
