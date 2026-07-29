@@ -51,13 +51,13 @@ GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 
    Launch it with the Bash tool's background mode - the server serves until interrupted, so a foreground call would hang the skill. It prints the URL it serves at, opens the browser itself, and exits immediately when a dashboard is already running on the port. If `$GRAMMAR_HOME/dashboard/server.py` does not exist (the checker hook copies it there on every message, so this only happens when that hook has not run at all), launch `${CLAUDE_PLUGIN_ROOT}/dashboard/server.py` instead this once and say so in the reply.
 
-   Background mode returns no output in the tool result, so poll the launch with `BashOutput` until it has printed a line, and read that line before replying - it has four outcomes and only the first two mean the page is usable:
-   - `serving the cc-grammar-coach dashboard at <url>` - it started; reply with the template below.
+   The launcher's line appears only after the background command runs, so poll for it before replying: use `BashOutput` when that tool is available, otherwise read the output file whose path the Bash tool reported when it backgrounded the command. That line has four outcomes and only the first two mean the page is usable:
+   - `serving the cc-grammar-coach dashboard at <url> (Ctrl+C to stop)` - it started; reply with the template below.
    - `dashboard already running at <url>` - an identical server was already up; reply with the template below.
    - `dashboard already running at <url> with version <v> ... stop it (Ctrl+C in its terminal, or pkill -f dashboard/server.py) and relaunch to pick up the update` - a server from an older plugin version holds the port and will serve the old dashboard. Relay that whole sentence instead of the plain URL line, so the user knows to restart it.
    - a nonzero exit - the port cannot serve this dashboard: a foreign program holds it, a dashboard on it serves a different grammar home, or `GRAMMAR_DASHBOARD_PORT` is not a port number. Relay the message and stop; do not report a URL, it would point at something other than the lesson.
 
-7. Reply with exactly this template, using the URL the server printed. The dashboard titles the page "New Lesson", so the reply says lesson, not drill:
+7. Reply with exactly this template. Its first line shows the shape of the URL - copy the URL the server printed verbatim in its place. The dashboard titles the page "New Lesson", so the reply says lesson, not drill:
 
    ```
    Lesson ready: http://127.0.0.1:<port>/#drill=<file>
