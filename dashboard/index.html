@@ -126,6 +126,80 @@ body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
   overflow-x: auto;
   white-space: nowrap;
 }
+
+/* ---------- progress view (ported from the progress template) ---------- */
+
+.pg-wrap { gap: var(--duo-space-4); }
+.pg-panel { display: flex; flex-direction: column; gap: var(--duo-space-3); }
+.pg-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--duo-space-2); }
+
+/* The plot: a 36px left gutter carries the y tick labels; hairline gridlines and
+   the band row are positioned over the same area so bars share the baseline,
+   which is the plot's bottom border. */
+.pg-plot { position: relative; height: var(--pg-plot-h, 180px); border-bottom: 1px solid var(--duo-border); }
+.pg-grid-line { position: absolute; left: var(--pg-gutter, 36px); right: 0; border-top: 1px solid var(--duo-border); }
+.pg-grid-line span {
+  position: absolute;
+  right: calc(100% + var(--duo-space-2));
+  transform: translateY(-50%);
+  font-size: var(--duo-text-xs);
+  color: var(--duo-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pg-bands { position: absolute; inset: 0 0 0 var(--pg-gutter, 36px); display: flex; align-items: flex-end; gap: 2px; }
+.pg-band {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: var(--duo-radius-sm) var(--duo-radius-sm) 0 0;
+}
+.pg-band:hover { background: var(--duo-info-soft); }
+/* min-height keeps a single mistake visible as a sliver on the shared scale. */
+.pg-bar {
+  width: min(24px, 100%);
+  min-height: 2px;
+  background: var(--duo-info-ink);
+  border-radius: var(--duo-space-1) var(--duo-space-1) 0 0;
+}
+.pg-band:hover .pg-bar { filter: brightness(1.12); }
+
+.pg-xaxis {
+  display: flex;
+  gap: 2px;
+  padding-left: var(--pg-gutter, 36px);
+  font-size: var(--duo-text-xs);
+  color: var(--duo-text-muted);
+}
+.pg-xaxis span { flex: 1; min-width: 0; text-align: center; white-space: nowrap; }
+
+.pg-multiples { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: var(--duo-space-3); }
+
+.pg-tip {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10;
+  background: var(--duo-surface);
+  border: var(--duo-stroke) solid var(--duo-border);
+  border-radius: var(--duo-radius-sm);
+  padding: var(--duo-space-1) var(--duo-space-2);
+  font-size: var(--duo-text-sm);
+  white-space: nowrap;
+}
+.pg-tip b { font-weight: var(--duo-weight-heavy); }
+
+.pg-details summary { cursor: pointer; font-size: var(--duo-text-lg); font-weight: var(--duo-weight-heavy); }
+.pg-tablewrap { overflow-x: auto; margin-top: var(--duo-space-3); }
+.pg-table { border-collapse: collapse; width: 100%; font-size: var(--duo-text-sm); font-variant-numeric: tabular-nums; }
+.pg-table th, .pg-table td { padding: var(--duo-space-1) var(--duo-space-2); border-bottom: 1px solid var(--duo-border); text-align: right; }
+/* nowrap on the bucket column: the shell is narrower than the old standalone page,
+   which squeezed "Jul 24" onto two lines - the wrapper scrolls instead. */
+.pg-table th:first-child, .pg-table td:first-child { text-align: left; white-space: nowrap; }
+.pg-table thead th { color: var(--duo-text-muted); font-size: var(--duo-text-xs); text-transform: uppercase; letter-spacing: 0.06em; }
+.pg-table tr:last-child td { font-weight: var(--duo-weight-bold); }
 </style>
 </head>
 <body data-view="drills">
@@ -199,15 +273,63 @@ body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
 </main>
 
 <main class="view duo-hidden" id="view-progress">
-  <div class="duo-card duo-stack" id="progressPane">
-    <h2 class="duo-heading">Progress</h2>
-    <p class="duo-muted" style="margin: 0">The chart view lands here in an upcoming update.</p>
+  <div class="duo-stack pg-wrap duo-hidden" id="progressPane">
+    <div class="duo-stack duo-stack--tight">
+      <h1 class="duo-title">Grammar Progress</h1>
+      <div class="duo-muted" id="pgSpan"></div>
+    </div>
+
+    <div class="duo-row">
+      <div class="duo-stat duo-stat--info">
+        <div class="duo-stat__cap">Logged mistakes</div>
+        <div class="duo-stat__value" id="pgMistakes"></div>
+      </div>
+      <div class="duo-stat">
+        <div class="duo-stat__cap">Last 7 days</div>
+        <div class="duo-stat__value" id="pgLast7"></div>
+      </div>
+      <div class="duo-stat">
+        <div class="duo-stat__cap">Categories</div>
+        <div class="duo-stat__value" id="pgCategories"></div>
+      </div>
+    </div>
+
+    <section class="duo-card pg-panel">
+      <div class="pg-head">
+        <h2 class="duo-heading">All mistakes</h2>
+        <span class="duo-muted" id="pgAllUnit"></span>
+      </div>
+      <div id="pgAllChart" class="duo-stack duo-stack--tight"></div>
+    </section>
+
+    <section class="duo-stack duo-stack--loose">
+      <div class="pg-head">
+        <h2 class="duo-heading">By category</h2>
+        <span class="duo-muted" id="pgMultiNote"></span>
+      </div>
+      <div class="pg-multiples" id="pgMultiples"></div>
+    </section>
+
+    <details class="duo-card pg-details">
+      <summary>Table view</summary>
+      <div class="pg-tablewrap" id="pgTable"></div>
+    </details>
+
+    <div class="duo-muted" style="font-size: var(--duo-text-sm)" id="pgNote"></div>
   </div>
+
+  <div class="duo-hidden" id="progressMsg"></div>
 </main>
 
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; };
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
 const RESTART_CMD = 'python3 $GRAMMAR_HOME/dashboard/server.py';
 
 async function fetchJSON(url) {
@@ -678,6 +800,239 @@ document.addEventListener('keydown', e => {
 window.addEventListener('load', fit);
 window.addEventListener('resize', fit);
 
+/* ---------- progress: aggregation ----------
+ * Ported from the standalone progress builder this view replaces. Dates are the ones the ts string
+ * carries in its own offset - never a browser-local Date conversion, which drags a near-midnight
+ * foreign-offset entry into the neighbouring day. Buckets are therefore held as
+ * UTC midnight epochs: pure calendar arithmetic, no DST to step on.
+ */
+
+const DAY = 86400000;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const utcDay = (y, m, d) => Date.UTC(y, m - 1, d);
+const humanize = s => (s.slice(0, 1).toUpperCase() + s.slice(1)).replace(/-/g, ' ');
+const sum = a => a.reduce((x, y) => x + y, 0);
+/* Even maxima keep the mid tick an integer. */
+const niceMax = m => m <= 10 ? Math.max(2, 2 * Math.ceil(m / 2)) : 10 * Math.ceil(m / 10);
+
+// d = the calendar date the string names; at = the real instant, needed only by
+// the last-7-days window (a date-only string means local midnight, as in Python).
+function tsParts(ts) {
+  if (typeof ts !== 'string') return null;
+  const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(ts);
+  if (!m) return null;
+  const [y, mo, dd] = [+m[1], +m[2], +m[3]];
+  const at = /^\d{4}-\d\d-\d\d$/.test(ts) ? new Date(y, mo - 1, dd).getTime() : Date.parse(ts);
+  return isNaN(at) ? null : { d: utcDay(y, mo, dd), at };
+}
+
+function bucketOf(d, unit) {
+  if (unit === 'day') return d;
+  const t = new Date(d);
+  if (unit === 'week') return d - ((t.getUTCDay() + 6) % 7) * DAY;
+  return utcDay(t.getUTCFullYear(), t.getUTCMonth() + 1, 1);
+}
+
+function bucketSeq(first, last, unit) {
+  const seq = [];
+  const end = bucketOf(last, unit);
+  for (let b = bucketOf(first, unit); b <= end;) {
+    seq.push(b);
+    if (unit === 'month') {
+      const t = new Date(b);
+      b = utcDay(t.getUTCFullYear(), t.getUTCMonth() + 2, 1);
+    } else b += (unit === 'day' ? 1 : 7) * DAY;
+  }
+  return seq;
+}
+
+function aggregate(rows) {
+  const events = [];
+  let undated = 0;
+  rows.forEach(row => {
+    if (!row || typeof row !== 'object') return;
+    const cats = (Array.isArray(row.fixes) ? row.fixes : []).filter(f => f && f.category).map(f => f.category);
+    if (!cats.length) return;
+    const at = tsParts(row.ts);
+    if (!at) { undated += cats.length; return; }
+    cats.forEach(c => events.push({ ...at, c }));
+  });
+  if (!events.length) return { undated, events: [] };
+
+  const first = events.reduce((a, e) => Math.min(a, e.d), Infinity);
+  const last = events.reduce((a, e) => Math.max(a, e.d), -Infinity);
+  const spanDays = (last - first) / DAY;
+  const unit = spanDays <= 60 ? 'day' : spanDays <= 420 ? 'week' : 'month';
+
+  const buckets = bucketSeq(first, last, unit);
+  const index = new Map(buckets.map((b, i) => [b, i]));
+  const counts = new Map();
+  const total = buckets.map(() => 0);
+  events.forEach(e => {
+    const i = index.get(bucketOf(e.d, unit));
+    if (!counts.has(e.c)) counts.set(e.c, buckets.map(() => 0));
+    counts.get(e.c)[i]++;
+    total[i]++;
+  });
+  const categories = [...counts.keys()]
+    .sort((a, b) => sum(counts.get(b)) - sum(counts.get(a)) || (a < b ? -1 : a > b ? 1 : 0))
+    .map(c => ({ label: humanize(c), counts: counts.get(c), total: sum(counts.get(c)) }));
+
+  const md = b => `${MONTHS[new Date(b).getUTCMonth()]} ${String(new Date(b).getUTCDate()).padStart(2, '0')}`;
+  const year = b => new Date(b).getUTCFullYear();
+  const cutoff = Date.now() - 7 * DAY;
+  return {
+    events,
+    unit,
+    unitLabel: { day: 'daily', week: 'weekly', month: 'monthly' }[unit],
+    span: `${md(first)}${year(first) === year(last) ? '' : ', ' + year(first)} - ${md(last)}, ${year(last)}`,
+    labels: buckets.map(b => unit === 'month' ? `${MONTHS[new Date(b).getUTCMonth()]} ${year(b)}` : md(b)),
+    total,
+    categories,
+    stats: { mistakes: events.length, last7: events.filter(e => e.at >= cutoff).length, categories: categories.length },
+    undated,
+  };
+}
+
+/* ---------- progress: chart ---------- */
+
+const pgTip = el('div', 'pg-tip duo-hidden');
+document.body.append(pgTip);
+
+function bindTips(bands) {
+  bands.addEventListener('pointerover', e => {
+    const band = e.target.closest('.pg-band');
+    if (!band) return;
+    pgTip.replaceChildren(el('b', '', band.dataset.value), ' ', el('span', 'duo-muted', band.dataset.label));
+    pgTip.classList.remove('duo-hidden');
+  });
+  bands.addEventListener('pointermove', e => {
+    pgTip.style.left = Math.min(e.clientX + 12, innerWidth - pgTip.offsetWidth - 8) + 'px';
+    pgTip.style.top = (e.clientY - pgTip.offsetHeight - 12) + 'px';
+  });
+  bands.addEventListener('pointerout', () => pgTip.classList.add('duo-hidden'));
+}
+
+function pgChart(values, labels, yMax, name, ticks) {
+  const plot = el('div', 'pg-plot');
+  [[50, yMax / 2], [100, yMax]].forEach(([pct, v]) => {
+    const line = el('div', 'pg-grid-line');
+    line.style.bottom = pct + '%';
+    if (ticks) line.append(el('span', '', String(v)));
+    plot.append(line);
+  });
+  const bands = el('div', 'pg-bands');
+  values.forEach((v, i) => {
+    const band = el('div', 'pg-band');
+    band.dataset.value = v;
+    band.dataset.label = name + ' \u00b7 ' + labels[i];
+    if (v > 0) {
+      const bar = el('div', 'pg-bar');
+      bar.style.height = (100 * v / yMax) + '%';
+      band.append(bar);
+    }
+    bands.append(band);
+  });
+  plot.append(bands);
+  bindTips(bands);
+  const xaxis = el('div', 'pg-xaxis');
+  const step = Math.max(1, Math.ceil(values.length / 6));
+  labels.forEach((l, i) => xaxis.append(el('span', '', i % step === 0 ? l : '')));
+  const frag = document.createDocumentFragment();
+  frag.append(plot, xaxis);
+  return frag;
+}
+
+/* ---------- progress: view ---------- */
+
+// PG is the aggregate currently on screen, recomputed from the live log on every
+// visit to the tab - the chart is a pure function of history.jsonl.
+let PG = null;
+
+function progressMessage(html) {
+  $('progressPane').classList.add('duo-hidden');
+  $('progressMsg').classList.remove('duo-hidden');
+  $('progressMsg').innerHTML = html;
+}
+
+function emptyMarkup(state, heading, body) {
+  return `<div class="duo-card duo-stack" data-state="${state}">
+    <h2 class="duo-heading">${heading}</h2>
+    <p class="duo-muted" style="margin: 0">${body}</p>
+  </div>`;
+}
+
+async function loadProgress() {
+  let rows;
+  try {
+    rows = await fetchJSON('/api/history');
+  } catch (e) {
+    PG = null;
+    return progressMessage(serverGoneMarkup());
+  }
+  if (!rows.length) {
+    PG = null;
+    return progressMessage(emptyMarkup('no-history', 'Nothing logged yet',
+      'The grammar hook has not recorded a single message. Write some English in Claude Code and the chart fills itself in.'));
+  }
+  PG = aggregate(rows);
+  if (!PG.events.length) {
+    return progressMessage(emptyMarkup('no-dated', 'No dated mistakes yet',
+      `${PG.undated} logged mistake${PG.undated === 1 ? '' : 's'} carry no readable timestamp, so there is nothing to plot yet - write more English first.`));
+  }
+  renderProgress();
+}
+
+function renderProgress() {
+  $('progressMsg').classList.add('duo-hidden');
+  $('progressPane').classList.remove('duo-hidden');
+  $('pgSpan').textContent = PG.span + ' \u00b7 ' + PG.unitLabel + ' buckets';
+  $('pgMistakes').textContent = PG.stats.mistakes;
+  $('pgLast7').textContent = PG.stats.last7;
+  $('pgCategories').textContent = PG.stats.categories;
+
+  $('pgAllUnit').textContent = 'per ' + PG.unit;
+  $('pgAllChart').replaceChildren(pgChart(PG.total, PG.labels, niceMax(Math.max(...PG.total)), 'All mistakes', true));
+
+  const catMax = niceMax(Math.max(...PG.categories.flatMap(c => c.counts)));
+  $('pgMultiNote').textContent = 'shared scale, 0-' + catMax + ' per ' + PG.unit;
+  $('pgMultiples').replaceChildren(...PG.categories.map(c => {
+    const card = el('div', 'duo-card pg-panel');
+    card.style.setProperty('--pg-plot-h', '96px');
+    const head = el('div', 'pg-head');
+    head.append(el('h3', 'duo-heading', c.label), el('span', 'duo-muted', String(c.total)));
+    card.append(head, pgChart(c.counts, PG.labels, catMax, c.label, false));
+    return card;
+  }));
+
+  const table = el('table', 'pg-table');
+  const hrow = el('tr');
+  hrow.append(el('th', '', PG.unit));
+  PG.categories.forEach(c => hrow.append(el('th', '', c.label)));
+  hrow.append(el('th', '', 'Total'));
+  const thead = el('thead');
+  thead.append(hrow);
+  const tbody = el('tbody');
+  PG.labels.forEach((l, i) => {
+    const row = el('tr');
+    row.append(el('td', '', l));
+    PG.categories.forEach(c => row.append(el('td', '', String(c.counts[i]))));
+    row.append(el('td', '', String(PG.total[i])));
+    tbody.append(row);
+  });
+  const trow = el('tr');
+  trow.append(el('td', '', 'Total'));
+  PG.categories.forEach(c => trow.append(el('td', '', String(c.total))));
+  trow.append(el('td', '', String(PG.stats.mistakes)));
+  tbody.append(trow);
+  table.append(thead, tbody);
+  $('pgTable').replaceChildren(table);
+
+  let note = 'Raw counts of flagged mistakes: a ' + PG.unit + ' with more written English naturally shows more mistakes.';
+  if (PG.undated > 0) note += ' ' + PG.undated + ' mistakes without a readable timestamp are not plotted.';
+  $('pgNote').textContent = note;
+}
+
 /* ---------- hash router ---------- */
 
 function route() {
@@ -693,6 +1048,7 @@ function route() {
   else {
     wantedFile = null;
     if (view === 'drills') loadDrills();
+    else loadProgress();
   }
 }
 
