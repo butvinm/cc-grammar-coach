@@ -1,19 +1,17 @@
 #!/usr/bin/env python3
-"""Build a grammar drill page from drill data JSON.
+"""Validate authored drill data and store it for the dashboard.
 
-Usage: build_drill.py <data.json> [output.html]
+Usage: prepare_drill.py --kind drill|learn <data.json>
 
-Validates the drill data, injects it into assets/drill-template.html along with assets/duo.css, writes the page to $GRAMMAR_HOME/drills/drill-<date>-<HHMM>.html (GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach; an explicit output path overrides both), and prints the path. Opening the page is the caller's job, so that building it can be scripted without spawning a browser. Stdlib only.
+Validates the authored data, stamps the `kind` badge the dashboard shows, writes the result to $GRAMMAR_HOME/drills/drill-<date>-<HHMM>.json (GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach) and prints the file name. Nothing is written when validation fails. The dashboard reads the file over its /api/drills endpoints, so opening it is the launcher's job. Stdlib only.
 """
 
+import argparse
 import json
 import os
 import sys
 from datetime import datetime
 from pathlib import Path
-
-PLACEHOLDER = "__DRILL_DATA__"
-CSS_PLACEHOLDER = "__DUO_CSS__"
 
 
 def fail(msg: str) -> None:
@@ -62,33 +60,27 @@ def validate(data: dict) -> None:
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        fail("usage: build_drill.py <data.json> [output.html]")
-    data_path = Path(sys.argv[1])
+    parser = argparse.ArgumentParser(description="validate authored drill data and store it for the dashboard")
+    parser.add_argument("--kind", required=True, choices=("drill", "learn"), help="which skill authored the data")
+    parser.add_argument("data", metavar="data.json", help="path to the authored drill data")
+    args = parser.parse_args()
+
     try:
-        data = json.loads(data_path.read_text(encoding="utf-8"))
+        data = json.loads(Path(args.data).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot read drill data: {exc}")
+    if not isinstance(data, dict):
+        fail("drill data must be a JSON object")
     data.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
     validate(data)
+    data["kind"] = args.kind
 
-    assets = Path(__file__).parent.parent / "assets"
-    template = (assets / "drill-template.html").read_text(encoding="utf-8")
-    # duo.css is inlined rather than linked: the page is written to a different directory than the assets and has to stand alone.
-    page = template.replace(CSS_PLACEHOLDER, (assets / "duo.css").read_text(encoding="utf-8"))
-    # Escaping '</' keeps any '</script>' inside drill strings from ending the script tag.
-    payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    page = page.replace(PLACEHOLDER, payload)
-
-    if len(sys.argv) > 2:
-        out = Path(sys.argv[2])
-    else:
-        home = Path(os.environ.get("GRAMMAR_HOME", Path.home() / ".claude" / "cc-grammar-coach"))
-        out_dir = home / "drills"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        out = out_dir / f"drill-{data['date']}-{datetime.now().strftime('%H%M')}.html"
-    out.write_text(page, encoding="utf-8")
-    print(out)
+    home = Path(os.environ.get("GRAMMAR_HOME", Path.home() / ".claude" / "cc-grammar-coach"))
+    out_dir = home / "drills"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"drill-{data['date']}-{datetime.now().strftime('%H%M')}.json"
+    out.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(out.name)
 
 
 if __name__ == "__main__":

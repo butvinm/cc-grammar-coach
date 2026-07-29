@@ -34,24 +34,26 @@ GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
    - The single topic gets `count: 0` (the page renders it as "new topic") and a 3-5 sentence lesson - new material needs more setup than remediation - with 6-8 `questions`.
    - Lesson `examples` come from the user's logged sentences when the log has usable evidence for the topic. When it does not, invent examples showing the typical error a speaker of the user's native language makes instead - do not present invented sentences as the user's own.
 
-5. Write the data to a JSON file in the scratchpad, then run the builder from the plugin root:
+5. Write the data to a JSON file in the scratchpad, then run the prepare script from the plugin root:
 
    ```
-   python3 "${CLAUDE_PLUGIN_ROOT}/skills/drill/scripts/build_drill.py" <data.json>
+   python3 "${CLAUDE_PLUGIN_ROOT}/skills/drill/scripts/prepare_drill.py" --kind learn <data.json>
    ```
 
-   The script validates the data, writes `$GRAMMAR_HOME/drills/drill-<date>-<HHMM>.html`, and prints the path without opening it. Open the printed path portably - `open` on macOS, `xdg-open` on Linux, and if neither exists just report the path:
+   The script validates the data, stamps `"kind": "learn"` (the dashboard badges the session as a lesson rather than a drill), writes `$GRAMMAR_HOME/drills/drill-<date>-<HHMM>.json`, and prints that file name. It writes nothing when validation fails, so fix the reported error and rerun.
+
+6. Open the lesson in the dashboard, passing the printed file name as the hash route:
 
    ```
-   if command -v open >/dev/null 2>&1; then open "<path>"
-   elif command -v xdg-open >/dev/null 2>&1; then xdg-open "<path>"
-   else echo "Open this in a browser: <path>"; fi
+   python3 "$GRAMMAR_HOME/dashboard/server.py" --url-path "#drill=<file>"
    ```
 
-6. Reply with exactly this template, picking `New topic` or `Review` to match step 2:
+   Launch it with the Bash tool's background mode - the server serves until interrupted, so a foreground call would hang the skill. It prints the URL it serves at, opens the browser itself, and exits immediately when a dashboard is already running on the port. If `$GRAMMAR_HOME/dashboard/server.py` does not exist yet (the checker hook copies it there on the first message of a session and may not have run), launch `${CLAUDE_PLUGIN_ROOT}/dashboard/server.py` instead this once and say so in the reply.
+
+7. Reply with exactly this template, using the URL the server printed and picking `New topic` or `Review` to match step 2:
 
    ```
-   Drill ready: <output path>
+   Drill ready: http://127.0.0.1:<port>/#drill=<file>
    New topic: <label> (<iso-week>)
    Questions: <total count>
    ```

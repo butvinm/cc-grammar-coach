@@ -1,6 +1,6 @@
 # Drill data authoring
 
-Shared by the drill and learn skills. Read this before writing the data JSON that `scripts/build_drill.py` turns into the quiz page.
+Shared by the drill and learn skills. Read this before writing the data JSON that `scripts/prepare_drill.py` validates and stores for the dashboard.
 
 Use plain ASCII punctuation in all generated text (straight quotes, hyphens, three dots) - this environment flags em dashes, arrows, and other typographic symbols in written files.
 
@@ -54,5 +54,7 @@ Use plain ASCII punctuation in all generated text (straight quotes, hyphens, thr
   ]
 }
 ```
+
+Do not author a `kind` key: `prepare_drill.py` stamps it from its `--kind` flag (`drill` or `learn`), which is fixed per skill, and overwrites anything already there.
 
 `topic` must match a topic `id`. `answer` is a 0-based index into `options`. `answers` lists every acceptable rewrite; comparison ignores only case, extra spaces, and end punctuation, so enumerate variants yourself - contraction and full forms (We've / We have), and each valid article or tense choice.
