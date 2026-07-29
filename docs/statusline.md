@@ -36,10 +36,12 @@ fi
 
 All state lives under one directory, `~/.claude/cc-grammar-coach`, overridable by setting `$GRAMMAR_HOME`. A fresh install creates it lazily; each component makes the subdirectories it writes to. It holds:
 
-| Path                                         | What it is                                                                                                                     |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `status/<session-id>`                        | The current feedback line(s) for one session, read by the statusline. Files older than a day are tidied automatically.         |
-| `history.jsonl`                              | Append-only mistake log, one JSON object per non-clean message. The drill's data source.                                       |
-| `drills/`                                    | Generated self-contained HTML lessons, one per drill.                                                                          |
-| `curriculum.tsv`                             | Learn-mode progress: one `<iso-week>\t<topic-id>` line per week, enforcing one new syllabus topic per week.                    |
-| `render-grammar.sh`, `grammar-statusline.sh` | Stable copies of the statusline scripts, refreshed by the hook whenever the plugin updates; the statusline wiring points here. |
+| Path                                         | What it is                                                                                                                                                                                                            |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status/<session-id>`                        | The current feedback line(s) for one session, read by the statusline. Files older than a day are tidied automatically.                                                                                                |
+| `history.jsonl`                              | Append-only mistake log, one JSON object per non-clean message. The drill's and the progress view's data source.                                                                                                      |
+| `drills/`                                    | Authored drill and lesson data, one JSON file per session, listed by the dashboard. HTML files generated before the dashboard existed sit alongside them, ignored by the dashboard but still openable as plain files. |
+| `results.jsonl`                              | Append-only quiz results, one JSON object per finished quiz, written by the dashboard server.                                                                                                                         |
+| `dashboard/`                                 | Stable copy of the local web app (`server.py`, `index.html`, `duo.css`), refreshed by the hook whenever the plugin updates; this is the copy the skills and the documented launch command run.                        |
+| `curriculum.tsv`                             | Learn-mode progress: one `<iso-week>\t<topic-id>` line per week, enforcing one new syllabus topic per week.                                                                                                           |
+| `render-grammar.sh`, `grammar-statusline.sh` | Stable copies of the statusline scripts, refreshed by the hook whenever the plugin updates; the statusline wiring points here.                                                                                        |

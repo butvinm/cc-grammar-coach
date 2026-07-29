@@ -209,10 +209,15 @@ Evidence and outcomes:
 
 ### Task 9: Update documentation
 
-- [ ] rework README.md: dashboard section (canonical launch command, on-demand lifecycle, localhost-only note replacing the offline-page claim), updated drill/learn/progress sections; screenshots: replace `docs/img/quiz-correct.png`, `docs/img/quiz-mistake.png` (dashboard quiz), replace `docs/img/progress.png` (dashboard progress view), add `docs/img/dashboard-drills.png` (list view); `docs/img/statusline.png` unchanged
-- [ ] update `docs/statusline.md` state table (unconditional): reword `drills/` (authored JSON, legacy HTML alongside), add `dashboard/` and `results.jsonl` rows
-- [ ] annotate `docs/ideas.md`: the line-45 UI/UX bullet's keyboard-navigation clause is done and the navigation-between-views concern is covered by #26; the grouped-mistakes-by-type browser with per-type lessons remains open
-- [ ] move this plan to `docs/plans/completed/`
+- [x] rework README.md: dashboard section (canonical launch command, on-demand lifecycle, localhost-only note replacing the offline-page claim), updated drill/learn/progress sections; screenshots: replace `docs/img/quiz-correct.png`, `docs/img/quiz-mistake.png` (dashboard quiz), replace `docs/img/progress.png` (dashboard progress view), add `docs/img/dashboard-drills.png` (list view); `docs/img/statusline.png` unchanged
+- [x] update `docs/statusline.md` state table (unconditional): reword `drills/` (authored JSON, legacy HTML alongside), add `dashboard/` and `results.jsonl` rows
+- [x] annotate `docs/ideas.md`: the line-45 UI/UX bullet's keyboard-navigation clause is done and the navigation-between-views concern is covered by #26; the grouped-mistakes-by-type browser with per-type lessons remains open
+- [x] move this plan to `docs/plans/completed/` (deferred to the harness - Task 10 pending)
+- [decision] the four screenshots were taken against a byte copy of the real `$GRAMMAR_HOME` (the two sessions authored in Task 8, the 262-mistake log), served on a separate port, so finishing a quiz for the list-card score wrote into the copy's `results.jsonl` and the user's real home stayed untouched, as in Task 8
+- [decision] the quiz shots grew from the old 696x794 to 696x1000: `fit()` caps the card body at the viewport, and at 794 the green feedback box was cut in half on the tallest choice question (measured `need` = 684px of body, reached at a 1000px viewport). Both shots keep one size so the README's side-by-side `width="49%"` pair still lines up
+- [decision] `docs/img/progress.png` is a crop of the progress view (696x1094, cut on the small-multiples row boundary at the panel bottom), not the full page: the full page is 2151px tall at the 640px shell width and would render as an unreadable ribbon in the README
+- discovered (follow-up, not blocking): the quiz card clips instead of scrolling when the viewport is shorter than the tallest question needs - at a 794px-high window the feedback box loses its explanation line. `fit()` clamps `--drill-body-h` to `avail` with no overflow handling on the screen itself
+- verified: every command the README documents was run as written - the launch block prints `dashboard already running at http://127.0.0.1:8437/` and exits 0 (the "reopens the tab" claim), `GRAMMAR_DASHBOARD_PORT=8482` serves at that port and answers `GET /` 200, `ss -ltnp` shows the listener bound to `127.0.0.1:8437` only, and `curl -H "Host: evil.example"` gets 403 (the localhost-only claim). `grep -niE "offline|self-contained|build_drill|build_progress|xdg-open|progress.html|drill-template|progress-template"` over README.md and `docs/*.md` hits only the pasted terminal transcript inside `docs/ideas.md`, which is history. All markdown links and image paths in README.md and `docs/*.md` resolve
 
 ### Task 10: Live handover
 
