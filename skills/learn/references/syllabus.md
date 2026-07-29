@@ -2,7 +2,9 @@
 
 Work through in order; each entry: teaching angle + typical learner traps. Recast the angle and traps in terms of the user's native language when one is configured.
 
-1. **present-perfect-vs-past** (Present perfect vs past simple) - many languages have a single past tense, so the have-done/did split does not map. Teach: result-now vs finished-time. Traps: "I already fixed it yesterday" mixing, "did you ever use" for experience.
+A trap is lesson material, not automatically quiz material: a trap that is only a naturalness preference (a form both varieties accept, one just reads better) can be explained in the lesson but must never be the wrong answer in a question - `skills/drill/references/authoring.md` requires every distractor to be wrong in every standard variety of English.
+
+1. **present-perfect-vs-past** (Present perfect vs past simple) - many languages have a single past tense, so the have-done/did split does not map. Teach: result-now vs finished-time. Traps: present perfect pinned to a finished time ("I have fixed it yesterday"), past simple for a state still running ("I worked here since 2020"). American English accepts past simple with already/just/yet ("I already fixed it") and with ever ("did you ever use it"), so teach those as a British/American difference, never as an error.
 2. **question-formation** (Questions and auxiliaries) - many languages ask with intonation or word order alone; English requires do/does/did or inversion. Traps: "why it fails?", "does it returns?", embedded questions ("I wonder does it work").
 3. **conditionals** (Real and unreal conditionals) - many languages allow a future form in the condition; English bans "will" in the if-clause. Traps: "if it will fail", "if I would know".
 4. **gerund-vs-infinitive** (Gerund vs infinitive) - stop doing / stop to do change meaning; verbs select one form arbitrarily. Traps: "suggest to do", "avoid to use", "worth to try".

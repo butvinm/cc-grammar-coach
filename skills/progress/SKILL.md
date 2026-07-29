@@ -9,10 +9,10 @@ Chart the mistake log over time: a column chart of all mistakes, a small-multipl
 
 To practice the logged mistakes instead of charting them, use the `drill` skill; to learn a new topic, use the `learn` skill.
 
-1. Open the dashboard on the progress view. Grammar home defaults to `~/.claude/cc-grammar-coach` and is overridden by `$GRAMMAR_HOME`; Bash tool calls do not share shell state, so resolving it and launching the server happen in one command:
+1. Open the dashboard on the progress view. Grammar home defaults to `~/.claude/cc-grammar-coach` and is overridden by `$GRAMMAR_HOME`; Bash tool calls do not share shell state, so resolving it and launching the server happen in one command, and it is exported - the server reads `GRAMMAR_HOME` from the environment and would serve the default home if a plain shell assignment kept it out of the server's:
 
    ```
-   GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
+   export GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
    python3 "$GRAMMAR_HOME/dashboard/server.py" --url-path "#progress"
    ```
 
@@ -24,11 +24,13 @@ To practice the logged mistakes instead of charting them, use the `drill` skill;
    - `dashboard already running at <url> with version <v> ... stop it (Ctrl+C in its terminal, or pkill -f dashboard/server.py) and relaunch to pick up the update` - a server from an older plugin version holds the port and will serve the old dashboard. Relay that whole sentence instead of the plain URL line, so the user knows to restart it.
    - a nonzero exit - the port cannot serve this dashboard: a foreign program holds it, a dashboard on it serves a different grammar home, or `GRAMMAR_DASHBOARD_PORT` is not a port number. Relay the message and stop; do not report a URL, it would point at something other than the chart.
 
-2. Reply with exactly this template. Its line shows the shape of the URL - copy the URL the server printed verbatim in its place:
+2. On the first two outcomes, reply with exactly this template - the last two replace it with what they say above, and nothing else may be added. Its line shows the shape of the URL - copy the URL the server printed verbatim in its place:
 
    ```
    Progress ready: http://127.0.0.1:<port>/#progress
    ```
+
+   The one permitted addition is a line saying you launched the plugin's copy of server.py, and only when `$GRAMMAR_HOME/dashboard/server.py` was missing.
 
    The page states its own counts; do not read the log yourself to summarize them in the reply.
 

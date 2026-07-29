@@ -20,7 +20,7 @@ The checker runs on every message automatically: it reviews the message, appends
 Lessons, quizzes, and the progress chart are views of one local web app. Start it whenever you want it - no skill involved, nothing running in the background until you ask:
 
 ```
-GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
+export GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 python3 "$GRAMMAR_HOME/dashboard/server.py"
 ```
 

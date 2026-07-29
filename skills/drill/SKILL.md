@@ -13,10 +13,10 @@ To teach a new topic from the weekly syllabus instead of drilling logged mistake
 
 ## Where the data lives
 
-Grammar home defaults to `~/.claude/cc-grammar-coach` and is overridden by `$GRAMMAR_HOME`. Bash tool calls do not share shell state, so it is resolved inside every command that needs it, never in a call of its own:
+Grammar home defaults to `~/.claude/cc-grammar-coach` and is overridden by `$GRAMMAR_HOME`. Bash tool calls do not share shell state, so it is resolved inside every command that needs it, never in a call of its own, and it is exported - the Python scripts below read `GRAMMAR_HOME` from the environment and would fall back to the default home if a plain shell assignment kept it out of theirs:
 
 ```
-GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
+export GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 ```
 
 The mistake log is `$GRAMMAR_HOME/history.jsonl` - one JSON object per line, appended by the checker hook, one line per non-clean message. There is no other log; do not grep any legacy file. Each line:
@@ -44,7 +44,7 @@ Use it two ways: `fixes[].category` ranks recent weak spots, and a line's presen
 1. Rank recent weak spots by counting `fixes[].category` over a recency window, not lifetime totals - the user's weak spots move, and a topic they have already stopped getting flagged on must stop being drilled. Run exactly this ranking, which prints `<count>\t<category>` lines in descending order:
 
    ```
-   GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
+   export GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
    python3 - "$GRAMMAR_HOME/history.jsonl" <<'PY'
    import collections, datetime, json, sys
    path = sys.argv[1]
@@ -82,6 +82,7 @@ Use it two ways: `fixes[].category` ranks recent weak spots, and a line's presen
 4. Write the data to a JSON file in the scratchpad, then run the prepare script from the plugin root:
 
    ```
+   export GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
    python3 "${CLAUDE_PLUGIN_ROOT}/skills/drill/scripts/prepare_drill.py" --kind drill <data.json>
    ```
 
@@ -90,7 +91,7 @@ Use it two ways: `fixes[].category` ranks recent weak spots, and a line's presen
 5. Open the drill in the dashboard, passing the printed file name as the hash route:
 
    ```
-   GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
+   export GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
    python3 "$GRAMMAR_HOME/dashboard/server.py" --url-path "#drill=<file>"
    ```
 
@@ -102,12 +103,14 @@ Use it two ways: `fixes[].category` ranks recent weak spots, and a line's presen
    - `dashboard already running at <url> with version <v> ... stop it (Ctrl+C in its terminal, or pkill -f dashboard/server.py) and relaunch to pick up the update` - a server from an older plugin version holds the port and will serve the old dashboard. Relay that whole sentence instead of the plain URL line, so the user knows to restart it.
    - a nonzero exit - the port cannot serve this dashboard: a foreign program holds it, a dashboard on it serves a different grammar home, or `GRAMMAR_DASHBOARD_PORT` is not a port number. Relay the message and stop; do not report a URL, it would point at something other than the drill.
 
-6. Reply with exactly this template. Its first line shows the shape of the URL - copy the URL the server printed verbatim in its place:
+6. On the first two outcomes of step 5, reply with exactly this template - the last two replace it with what they say above, and nothing else may be added. Its first line shows the shape of the URL - copy the URL the server printed verbatim in its place:
 
    ```
    Drill ready: http://127.0.0.1:<port>/#drill=<file>
    Topics: <label> (<N> logged mistakes), <label> (<N>), ...
    Questions: <total count>
    ```
+
+   The one permitted addition is a line saying you launched the plugin's copy of server.py, and only when `$GRAMMAR_HOME/dashboard/server.py` was missing.
 
 If `history.jsonl` has fewer than 5 usable grammar fixes overall, do not fabricate a generic lesson - say the log is too small and suggest writing more English first.

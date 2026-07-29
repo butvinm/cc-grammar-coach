@@ -13,10 +13,10 @@ To practice the user's logged mistakes instead of teaching new material, use the
 
 ## Where the data lives
 
-Grammar home defaults to `~/.claude/cc-grammar-coach` and is overridden by `$GRAMMAR_HOME`. Bash tool calls do not share shell state, so it is resolved inside every command that needs it, never in a call of its own:
+Grammar home defaults to `~/.claude/cc-grammar-coach` and is overridden by `$GRAMMAR_HOME`. Bash tool calls do not share shell state, so it is resolved inside every command that needs it, never in a call of its own, and it is exported - the Python scripts below read `GRAMMAR_HOME` from the environment and would fall back to the default home if a plain shell assignment kept it out of theirs:
 
 ```
-GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
+export GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 ```
 
 - `$GRAMMAR_HOME/history.jsonl` - the checker hook's mistake log, one JSON object per non-clean message: `{"ts", "message", "fixes": [{"category", "wrong", "fix", "rule"}], "rephrase"?}`. Used here only to personalize the lesson.
@@ -26,7 +26,9 @@ GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 
 1. Get the ISO week (`date +%G-W%V`) and read `$GRAMMAR_HOME/curriculum.tsv`.
 
-2. If a line for the current week exists, review that week's topic with a fresh quiz - the pace is one new topic per week, enforced here, not by a scheduler. Otherwise take the first topic from `references/syllabus.md` not yet listed in the file and append `<iso-week>\t<topic-id>` (create the file and its parent dir if missing).
+2. Pick the topic. If a line for the current week exists, the topic is that line's id, reviewed with a fresh quiz - the pace is one new topic per week, enforced here, not by a scheduler. Otherwise it is the first topic in `${CLAUDE_PLUGIN_ROOT}/skills/learn/references/syllabus.md` not yet listed in the file, and you append `<iso-week>\t<topic-id>` (create the file and its parent dir if missing).
+
+   On either branch, then read that topic's entry in `${CLAUDE_PLUGIN_ROOT}/skills/learn/references/syllabus.md`. curriculum.tsv stores only the bare topic id; the entry's `<label>`, teaching angle, and traps are the lesson's material and the only source of the `<label>` the reply template prints - never invent one, or the label drifts between the week's lesson and its review.
 
 3. Personalize: scan `history.jsonl` for the topic's constructions - both `fixes[]` on that category and `message` text using or conspicuously avoiding it - to see whether the user misuses or avoids the construction, and work that evidence into the lesson.
 
@@ -37,6 +39,7 @@ GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 5. Write the data to a JSON file in the scratchpad, then run the prepare script from the plugin root:
 
    ```
+   export GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
    python3 "${CLAUDE_PLUGIN_ROOT}/skills/drill/scripts/prepare_drill.py" --kind learn <data.json>
    ```
 
@@ -45,7 +48,7 @@ GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 6. Open the lesson in the dashboard, passing the printed file name as the hash route:
 
    ```
-   GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
+   export GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
    python3 "$GRAMMAR_HOME/dashboard/server.py" --url-path "#drill=<file>"
    ```
 
@@ -57,7 +60,7 @@ GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
    - `dashboard already running at <url> with version <v> ... stop it (Ctrl+C in its terminal, or pkill -f dashboard/server.py) and relaunch to pick up the update` - a server from an older plugin version holds the port and will serve the old dashboard. Relay that whole sentence instead of the plain URL line, so the user knows to restart it.
    - a nonzero exit - the port cannot serve this dashboard: a foreign program holds it, a dashboard on it serves a different grammar home, or `GRAMMAR_DASHBOARD_PORT` is not a port number. Relay the message and stop; do not report a URL, it would point at something other than the lesson.
 
-7. Reply with exactly this template. Its first line shows the shape of the URL - copy the URL the server printed verbatim in its place. The dashboard titles the page "New Lesson", so the reply says lesson, not drill:
+7. On the first two outcomes of step 6, reply with exactly this template - the last two replace it with what they say above, and nothing else may be added. Its first line shows the shape of the URL - copy the URL the server printed verbatim in its place. The dashboard titles the page "New Lesson", so the reply says lesson, not drill:
 
    ```
    Lesson ready: http://127.0.0.1:<port>/#drill=<file>
@@ -70,3 +73,5 @@ GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
    ```
    Review: <label> (<iso-week>)
    ```
+
+   `<label>` is the topic's syllabus label read in step 2. The one permitted addition is a line saying you launched the plugin's copy of server.py, and only when `$GRAMMAR_HOME/dashboard/server.py` was missing.
