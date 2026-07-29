@@ -181,6 +181,8 @@ body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
             <div class="duo-stat__value" id="statScore"></div>
           </div>
         </div>
+        <div class="duo-muted duo-hidden" style="text-align: center; font-size: var(--duo-text-sm)" id="prevAttempt"></div>
+        <div class="duo-feedback duo-feedback--bad duo-hidden" id="saveNotice"></div>
         <ul class="bytopic" id="byTopic"></ul>
         <div id="misses"></div>
       </section>
@@ -280,23 +282,33 @@ $('drillsList').addEventListener('click', e => {
 // DATA is the drill JSON currently loaded into the quiz machine; loadedFile is the
 // file it came from. Keeping both means a tab switch and a return does not reset a
 // quiz in progress - the issue #26 core flow - while a different file reloads.
-let DATA = null, loadedFile = null, wantedFile = null;
+// lastResult is the newest recorded attempt at loadedFile, shown on the result
+// screen as the previous score and replaced by each successful POST.
+let DATA = null, loadedFile = null, wantedFile = null, lastResult = null;
 
 const topicLabel = id => (DATA.topics.find(t => t.id === id) || { label: id }).label;
+
+async function loadLastResult(file) {
+  try {
+    return (await fetchJSON('/api/results')).filter(r => r && r.drill === file).pop() || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 async function showDrill(file) {
   wantedFile = file;
   if (DATA && loadedFile === file) { fit(); return; }
-  DATA = null; loadedFile = null;
-  let data;
+  DATA = null; loadedFile = null; lastResult = null;
+  let data, prev;
   try {
-    data = await fetchJSON('/api/drills/' + encodeURIComponent(file));
+    [data, prev] = await Promise.all([fetchJSON('/api/drills/' + encodeURIComponent(file)), loadLastResult(file)]);
   } catch (e) {
     if (wantedFile === file) showDrillError(file, e);
     return;
   }
   if (wantedFile !== file) return;
-  DATA = data; loadedFile = file;
+  DATA = data; loadedFile = file; lastResult = prev;
   $('drillError').classList.add('duo-hidden');
   $('drillShell').classList.remove('duo-hidden');
   renderLessons();
@@ -410,7 +422,7 @@ function fit() {
 // so it returns later in the same run. retired = answered right at least once,
 // which is what the progress bar measures (the queue length is not fixed).
 let queue = [], current = -1, retired = new Set(), firstTry = new Map(), misses = [];
-let selected = -1, phase = 'start', enterLocked = false;
+let selected = -1, phase = 'start', enterLocked = false, posted = false;
 
 const shuffle = a => {
   for (let i = a.length - 1; i > 0; i--) {
@@ -448,6 +460,8 @@ function toLessons() {
 function startQuiz() {
   queue = shuffle(DATA.questions.map((_, i) => i));
   retired = new Set(); firstTry = new Map(); misses = [];
+  // Each run POSTs once; the flag reopens here so a retry records its own result.
+  posted = false;
   nextQuestion();
 }
 
@@ -562,6 +576,15 @@ function showResult() {
   $('byTopic').innerHTML = Object.entries(per)
     .map(([t, s]) => `<li><span>${esc(topicLabel(t))}</span><span>${s.good} / ${s.total}</span></li>`).join('');
 
+  // Read before saving: the POST below replaces lastResult with this run's score.
+  const prev = lastResult;
+  $('prevAttempt').classList.toggle('duo-hidden', !prev);
+  if (prev) {
+    const when = typeof prev.ts === 'string' ? prev.ts.slice(0, 10) : '';
+    $('prevAttempt').textContent = `Previous attempt: ${prev.correct} / ${prev.total}${when ? ' on ' + when : ''}`;
+  }
+  saveResult({ ts: localISO(), drill: loadedFile, total, correct: good, byTopic: per });
+
   $('misses').innerHTML = misses.length === 0 ? '' :
     `<h3 class="duo-heading">Review</h3>` + misses.map(m => {
       const model = m.q.type === 'choice' ? m.q.options[m.q.answer] : m.q.answers[0];
@@ -573,6 +596,38 @@ function showResult() {
           `<span class="duo-fix__right">${esc(model)}</span>` +
         `</div></div>`;
     }).join('');
+}
+
+// Offset-carrying timestamp, matching history.jsonl: the date a result belongs to
+// is the local one, which a UTC toISOString() shifts either side of midnight.
+function localISO(d = new Date()) {
+  const p = n => String(Math.floor(Math.abs(n))).padStart(2, '0');
+  const off = -d.getTimezoneOffset();
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` +
+    `T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}` +
+    `${off < 0 ? '-' : '+'}${p(off / 60)}:${p(off % 60)}`;
+}
+
+async function saveResult(payload) {
+  if (posted) return;
+  posted = true;
+  const notice = $('saveNotice');
+  notice.classList.add('duo-hidden');
+  try {
+    const resp = await fetch('/api/results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error(String(resp.status));
+    lastResult = payload;
+  } catch (e) {
+    notice.innerHTML =
+      `<div class="duo-feedback__title">Result not saved</div>` +
+      `<div class="duo-feedback__note">The server did not accept it (${esc(e.message)}). Restart it and run the quiz again to record a score:</div>` +
+      `<div class="cmd" style="margin-top: var(--duo-space-2)">${RESTART_CMD}</div>`;
+    notice.classList.remove('duo-hidden');
+  }
 }
 
 $('quitBtn').onclick = toLessons;

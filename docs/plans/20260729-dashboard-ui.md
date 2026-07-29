@@ -116,9 +116,12 @@ Key design decisions:
 
 - Modify: `dashboard/index.html`
 
-- [ ] on reaching the result screen, POST the result payload once (guard against re-POST for the same completion); on failure the result screen shows a visible "result not saved" notice
-- [ ] drills list shows the last recorded result per drill; the result screen shows the previous attempt's score when one exists
-- [ ] verify: complete a fixture quiz twice - `results.jsonl` gains exactly two lines with correct totals and topics, and the second result screen shows the first attempt's score; kill the server mid-quiz and finish - the result screen shows the not-saved notice and the file is unchanged; reload the list - the card shows the latest recorded score
+- [x] on reaching the result screen, POST the result payload once (guard against re-POST for the same completion); on failure the result screen shows a visible "result not saved" notice
+- [x] drills list shows the last recorded result per drill; the result screen shows the previous attempt's score when one exists
+- [x] verify: complete a fixture quiz twice - `results.jsonl` gains exactly two lines with correct totals and topics, and the second result screen shows the first attempt's score; kill the server mid-quiz and finish - the result screen shows the not-saved notice and the file is unchanged; reload the list - the card shows the latest recorded score
+- note: the POST timestamp is written with the browser's local offset (`localISO`), matching `history.jsonl`, so a future accuracy-over-time chart can bucket results the same offset-respecting way the progress view buckets mistakes; `toISOString()` (UTC) was rejected because it shifts near-midnight attempts to the neighbouring day
+- note: `lastResult` is loaded alongside the drill JSON and replaced by each successful POST, so the previous-attempt line survives repeated "Try again" runs without a refetch; a failed POST leaves it untouched
+- discovered (follow-up, not blocking): the drills-list card score (Task 2) renders bare as `3 / 3` with no "last result" label - readable in context, but a candidate for a caption if the list ever grows more numbers
 
 ### Task 5: Progress view ported client-side
 
