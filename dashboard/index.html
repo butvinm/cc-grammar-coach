@@ -56,9 +56,31 @@ body {
 
 /* Per-view layout: the list and progress views flow top-down under the tab bar;
    only the quiz view centers its fixed-height card in the leftover viewport
-   (the place-items trap from PR #24 - centering must never grab tall flows). */
+   (the place-items trap from PR #24 - centering must never grab tall flows).
+   align-content, not place-items: the shell must still stretch to the full
+   shell width, which justify-items: center would shrink to fit its content. */
 .view { width: 100%; max-width: var(--duo-shell-width); }
-body[data-view="drill"] .view { flex: 1; display: grid; place-items: center; }
+body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
+
+/* ---------- quiz view (ported from the drill template) ---------- */
+
+/* One height for every screen, measured by fit(): the footer button must land on
+   the same pixel whichever screen is showing. */
+.duo-shell__body { height: var(--drill-body-h, 420px); }
+
+.screen { flex: 1; display: flex; flex-direction: column; gap: var(--duo-space-3); }
+
+.bytopic { list-style: none; padding: 0; margin: 0; }
+.bytopic li {
+  display: flex;
+  justify-content: space-between;
+  font-weight: var(--duo-weight-bold);
+  padding: var(--duo-space-2) 0;
+  border-bottom: var(--duo-stroke) solid var(--duo-border);
+}
+
+.miss { padding: var(--duo-space-2) 0; border-top: var(--duo-stroke) solid var(--duo-border); }
+.trophy { font-size: var(--duo-space-6); line-height: 1; text-align: center; }
 
 .session {
   width: 100%;
@@ -121,7 +143,57 @@ body[data-view="drill"] .view { flex: 1; display: grid; place-items: center; }
 </main>
 
 <main class="view duo-hidden" id="view-drill">
-  <div class="duo-card duo-stack" id="drillPane"></div>
+  <section class="duo-shell" id="drillShell">
+    <header class="duo-shell__header">
+      <button class="duo-icon-btn duo-hidden" id="quitBtn" title="Back to lessons" aria-label="Back to lessons">&times;</button>
+      <div class="duo-progress"><div class="duo-progress__fill" id="fill"></div></div>
+    </header>
+
+    <div class="duo-shell__body" id="drillBody">
+
+      <section class="screen" id="lessons">
+        <div class="duo-stack duo-stack--tight">
+          <h1 class="duo-title" id="drillTitle">Grammar Drill</h1>
+          <div class="duo-muted" id="drillDate"></div>
+          <div class="duo-muted" style="font-size: var(--duo-text-sm)">Keyboard: number keys or &uarr;/&darr; pick an answer &middot; Enter checks &middot; Esc goes back</div>
+        </div>
+        <div class="duo-row" id="chips"></div>
+        <div class="duo-stack duo-stack--loose" id="topics"></div>
+      </section>
+
+      <section class="screen duo-hidden" id="quiz">
+        <div class="duo-eyebrow" id="qtopic"></div>
+        <h2 class="duo-prompt" id="qprompt"></h2>
+        <div class="duo-stack" id="qbody"></div>
+        <div class="duo-feedback duo-bottom duo-hidden" id="feedback"></div>
+      </section>
+
+      <section class="screen duo-hidden" id="result">
+        <div class="trophy" id="trophy">&#127942;</div>
+        <h2 class="duo-title" style="text-align: center" id="resultTitle"></h2>
+        <div class="duo-row">
+          <div class="duo-stat duo-stat--info">
+            <div class="duo-stat__cap">Accuracy</div>
+            <div class="duo-stat__value" id="statAcc"></div>
+          </div>
+          <div class="duo-stat">
+            <div class="duo-stat__cap">First try</div>
+            <div class="duo-stat__value" id="statScore"></div>
+          </div>
+        </div>
+        <ul class="bytopic" id="byTopic"></ul>
+        <div id="misses"></div>
+      </section>
+
+    </div>
+
+    <footer class="duo-shell__footer">
+      <button class="duo-btn duo-btn--ghost duo-hidden" id="secondaryBtn">Lessons</button>
+      <button class="duo-btn duo-btn--wide" id="actionBtn">Start quiz</button>
+    </footer>
+  </section>
+
+  <div class="duo-hidden" id="drillError"></div>
 </main>
 
 <main class="view duo-hidden" id="view-progress">
@@ -138,7 +210,12 @@ const RESTART_CMD = 'python3 $GRAMMAR_HOME/dashboard/server.py';
 
 async function fetchJSON(url) {
   const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`${url}: ${resp.status}`);
+  if (!resp.ok) {
+    // status marks an answering server, which separates "drill gone" from "server gone".
+    const err = new Error(`${url}: ${resp.status}`);
+    err.status = resp.status;
+    throw err;
+  }
   return resp.json();
 }
 
@@ -198,13 +275,353 @@ $('drillsList').addEventListener('click', e => {
   if (card) location.hash = '#drill=' + encodeURIComponent(card.dataset.file);
 });
 
-/* ---------- drill view (quiz port lands here) ---------- */
+/* ---------- drill view: lessons, quiz machine, result ---------- */
 
-function showDrill(file) {
-  $('drillPane').innerHTML = `<h2 class="duo-heading">${esc(file)}</h2>
-    <p class="duo-muted" style="margin: 0">The quiz view lands here in an upcoming update.</p>
-    <button class="duo-btn duo-btn--ghost" onclick="location.hash = '#drills'">Back to drills</button>`;
+// DATA is the drill JSON currently loaded into the quiz machine; loadedFile is the
+// file it came from. Keeping both means a tab switch and a return does not reset a
+// quiz in progress - the issue #26 core flow - while a different file reloads.
+let DATA = null, loadedFile = null, wantedFile = null;
+
+const topicLabel = id => (DATA.topics.find(t => t.id === id) || { label: id }).label;
+
+async function showDrill(file) {
+  wantedFile = file;
+  if (DATA && loadedFile === file) { fit(); return; }
+  DATA = null; loadedFile = null;
+  let data;
+  try {
+    data = await fetchJSON('/api/drills/' + encodeURIComponent(file));
+  } catch (e) {
+    if (wantedFile === file) showDrillError(file, e);
+    return;
+  }
+  if (wantedFile !== file) return;
+  DATA = data; loadedFile = file;
+  $('drillError').classList.add('duo-hidden');
+  $('drillShell').classList.remove('duo-hidden');
+  renderLessons();
+  toLessons();
+  fit();
 }
+
+function showDrillError(file, err) {
+  $('drillShell').classList.add('duo-hidden');
+  const pane = $('drillError');
+  pane.classList.remove('duo-hidden');
+  pane.innerHTML = err.status
+    ? `<div class="duo-card duo-stack" data-state="drill-missing">
+        <h2 class="duo-heading">Drill not found</h2>
+        <p style="margin: 0">The server has no drill named ${esc(file)}.</p>
+        <button class="duo-btn duo-btn--ghost" data-back>Back to drills</button>
+      </div>`
+    : serverGoneMarkup();
+}
+
+$('drillError').addEventListener('click', e => {
+  if (e.target.closest('[data-back]')) location.hash = '#drills';
+});
+
+function renderLessons() {
+  $('drillTitle').textContent = DATA.kind === 'learn' ? 'New Lesson' : 'Grammar Drill';
+  $('drillDate').textContent = DATA.date || '';
+  $('chips').innerHTML = DATA.topics
+    .map(t => `<span class="duo-chip">${esc(t.label)} &middot; ${t.count ? t.count + ' logged' : 'new topic'}</span>`)
+    .join('');
+  $('topics').innerHTML = DATA.topics.map(t => `
+    <div class="duo-card duo-stack">
+      <h2 class="duo-heading">${esc(t.label)}</h2>
+      <p style="margin: 0">${esc(t.lesson.summary)}</p>
+      <div class="duo-stack">${t.lesson.examples.map(e => `
+        <div class="duo-stack duo-stack--tight">
+          <div class="duo-fix">
+            <span class="duo-fix__wrong">${esc(e.wrong)}</span>
+            <span class="duo-fix__arrow">-&gt;</span>
+            <span class="duo-fix__right">${esc(e.right)}</span>
+          </div>
+          <div class="duo-muted" style="font-size: var(--duo-text-sm)">${esc(e.note)}</div>
+        </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+/* ---------- sizing ----------
+ * The body height is fixed to the tallest question screen so the footer button
+ * never moves across the quiz. Only questions are measured: the lessons and
+ * result screens can be much taller, so they scroll inside the body (overflow-y)
+ * rather than stretching every question to their height and leaving a dead gap.
+ * Questions are measured with their feedback panel included, since that panel
+ * appears inside the body. The available height comes from the view container's
+ * top edge, not the whole viewport: the tab bar sits above it.
+ */
+
+function screenMarkup(el, inner) {
+  const c = el.cloneNode(inner === undefined);
+  c.removeAttribute('id');
+  c.classList.remove('duo-hidden');
+  if (inner !== undefined) c.innerHTML = inner;
+  return c.outerHTML;
+}
+
+function bodyHeightFor(markup) {
+  const probe = $('drillBody').cloneNode(false);
+  probe.removeAttribute('id');
+  probe.style.cssText =
+    `position: absolute; left: 0; top: 0; visibility: hidden;` +
+    `height: auto; width: ${$('drillBody').offsetWidth}px;`;
+  probe.innerHTML = markup;
+  $('drillShell').appendChild(probe);
+  const h = probe.scrollHeight;
+  probe.remove();
+  return h;
+}
+
+function questionMarkup(q) {
+  return screenMarkup($('quiz'),
+    `<div class="duo-eyebrow">${esc(topicLabel(q.topic))}</div>` +
+    `<h2 class="duo-prompt">${esc(q.prompt)}</h2>` +
+    `<div class="duo-stack">` +
+      (q.type === 'choice'
+        ? q.options.map((o, i) => `<button class="duo-option"><span class="duo-key">${i + 1}</span><span>${esc(o)}</span></button>`).join('')
+        : '<input class="duo-input">') +
+    `</div>` +
+    `<div class="duo-feedback duo-bottom">` +
+      `<div class="duo-feedback__title">x Not quite</div>` +
+      `<div class="duo-feedback__answer">${esc(q.type === 'choice' ? q.options[q.answer] : q.answers[0])}</div>` +
+      `<div class="duo-feedback__note">${esc(q.explain)}</div>` +
+    `</div>`);
+}
+
+function fit() {
+  if (!DATA || document.body.dataset.view !== 'drill') return;
+  let need = 0;
+  DATA.questions.forEach(q => { need = Math.max(need, bodyHeightFor(questionMarkup(q))); });
+  const shell = $('drillShell');
+  const chrome = shell.offsetHeight - $('drillBody').offsetHeight;
+  const viewTop = $('view-drill').getBoundingClientRect().top;
+  const pagePad = parseFloat(getComputedStyle(document.body).paddingBottom);
+  const avail = window.innerHeight - viewTop - pagePad - chrome;
+  document.documentElement.style.setProperty(
+    '--drill-body-h', `${Math.max(240, Math.min(need, avail))}px`);
+}
+
+/* ---------- quiz ---------- */
+
+// queue holds question indices still to ask; a missed question is pushed back on
+// so it returns later in the same run. retired = answered right at least once,
+// which is what the progress bar measures (the queue length is not fixed).
+let queue = [], current = -1, retired = new Set(), firstTry = new Map(), misses = [];
+let selected = -1, phase = 'start', enterLocked = false;
+
+const shuffle = a => {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+const normalize = s => s.toLowerCase().replace(/[.!?]+\s*$/, '').replace(/\s+/g, ' ').trim();
+
+function show(screen) {
+  ['lessons', 'quiz', 'result'].forEach(id => $(id).classList.toggle('duo-hidden', id !== screen));
+  $('quitBtn').classList.toggle('duo-hidden', screen !== 'quiz');
+  $('drillBody').scrollTop = 0;
+}
+
+function setAction(label, { danger = false, disabled = false, secondary = false } = {}) {
+  const btn = $('actionBtn');
+  btn.textContent = label;
+  btn.className = 'duo-btn duo-btn--wide' + (danger ? ' duo-btn--danger' : '');
+  btn.disabled = disabled;
+  $('secondaryBtn').classList.toggle('duo-hidden', !secondary);
+}
+
+function setProgress(pct) { $('fill').style.width = `${pct}%`; }
+
+function toLessons() {
+  show('lessons');
+  setProgress(0);
+  phase = 'start';
+  setAction('Start quiz');
+}
+
+function startQuiz() {
+  queue = shuffle(DATA.questions.map((_, i) => i));
+  retired = new Set(); firstTry = new Map(); misses = [];
+  nextQuestion();
+}
+
+function nextQuestion() {
+  if (!queue.length) return showResult();
+  show('quiz');
+  current = queue.shift();
+  selected = -1;
+  phase = 'answer';
+  const q = DATA.questions[current];
+  setProgress(Math.round(100 * retired.size / DATA.questions.length));
+  $('qtopic').textContent = topicLabel(q.topic);
+  $('qprompt').textContent = q.prompt;
+  $('feedback').classList.add('duo-hidden');
+  setAction('Check', { disabled: true });
+
+  const body = $('qbody');
+  body.innerHTML = '';
+  if (q.type === 'choice') {
+    q.options.forEach((opt, i) => {
+      const b = document.createElement('button');
+      b.className = 'duo-option';
+      const key = document.createElement('span');
+      key.className = 'duo-key';
+      key.textContent = i + 1;
+      const label = document.createElement('span');
+      label.textContent = opt;
+      b.append(key, label);
+      b.onclick = () => select(i, body);
+      body.appendChild(b);
+    });
+  } else {
+    const inp = document.createElement('input');
+    inp.className = 'duo-input';
+    inp.id = 'rewriteInput';
+    inp.placeholder = 'Type the corrected sentence';
+    inp.oninput = () => { $('actionBtn').disabled = !inp.value.trim(); };
+    body.appendChild(inp);
+    inp.focus();
+  }
+}
+
+function select(i, body) {
+  selected = i;
+  [...body.children].forEach((b, j) => b.classList.toggle('is-selected', j === i));
+  $('actionBtn').disabled = false;
+}
+
+function check() {
+  const q = DATA.questions[current];
+  let ok, given;
+  if (q.type === 'choice') {
+    given = q.options[selected];
+    ok = selected === q.answer;
+    [...$('qbody').children].forEach((b, j) => {
+      b.disabled = true;
+      b.classList.remove('is-selected');
+      if (j === q.answer) b.classList.add('is-correct');
+      else if (j === selected) b.classList.add('is-wrong');
+    });
+  } else {
+    const inp = $('rewriteInput');
+    given = inp.value;
+    ok = q.answers.some(a => normalize(a) === normalize(given));
+    inp.disabled = true;
+  }
+
+  if (!firstTry.has(current)) {
+    firstTry.set(current, ok);
+    if (!ok) misses.push({ q, given });
+  }
+  if (ok) retired.add(current);
+  else queue.push(current);
+
+  const model = q.type === 'choice' ? q.options[q.answer] : q.answers[0];
+  const fb = $('feedback');
+  fb.className = 'duo-feedback duo-bottom' + (ok ? '' : ' duo-feedback--bad');
+  fb.innerHTML =
+    `<div class="duo-feedback__title">${ok ? '&#10004; Nice!' : '&#10006; Not quite'}</div>` +
+    (ok ? '' : `<div class="duo-feedback__answer">${esc(model)}</div>`) +
+    `<div class="duo-feedback__note">${esc(q.explain)}</div>`;
+
+  setAction(queue.length ? 'Continue' : 'See result', { danger: !ok });
+  phase = 'continue';
+  // A held Enter would otherwise fire Check and Continue back to back, wiping the
+  // feedback before it can be read. Unlock only on the next keyup.
+  enterLocked = true;
+  setProgress(Math.round(100 * retired.size / DATA.questions.length));
+}
+
+function showResult() {
+  show('result');
+  setProgress(100);
+  phase = 'retry';
+  setAction('Try again', { secondary: true });
+
+  const total = DATA.questions.length;
+  const good = [...firstTry.values()].filter(Boolean).length;
+  const pct = Math.round(100 * good / total);
+  $('statAcc').textContent = `${pct}%`;
+  $('statScore').textContent = `${good} / ${total}`;
+  $('trophy').innerHTML = pct === 100 ? '&#127942;' : pct >= 60 ? '&#127881;' : '&#128170;';
+  $('resultTitle').textContent = pct === 100 ? 'Flawless' : pct >= 60 ? 'Lesson complete' : 'Keep drilling';
+
+  const per = {};
+  DATA.questions.forEach((q, i) => {
+    if (!firstTry.has(i)) return;
+    per[q.topic] = per[q.topic] || { good: 0, total: 0 };
+    per[q.topic].total++;
+    if (firstTry.get(i)) per[q.topic].good++;
+  });
+  $('byTopic').innerHTML = Object.entries(per)
+    .map(([t, s]) => `<li><span>${esc(topicLabel(t))}</span><span>${s.good} / ${s.total}</span></li>`).join('');
+
+  $('misses').innerHTML = misses.length === 0 ? '' :
+    `<h3 class="duo-heading">Review</h3>` + misses.map(m => {
+      const model = m.q.type === 'choice' ? m.q.options[m.q.answer] : m.q.answers[0];
+      return `<div class="miss duo-stack duo-stack--tight">` +
+        `<div class="duo-muted" style="font-size: var(--duo-text-sm)">${esc(m.q.prompt)}</div>` +
+        `<div class="duo-fix">` +
+          `<span class="duo-fix__wrong">${esc(m.given || '(blank)')}</span>` +
+          `<span class="duo-fix__arrow">-&gt;</span>` +
+          `<span class="duo-fix__right">${esc(model)}</span>` +
+        `</div></div>`;
+    }).join('');
+}
+
+$('quitBtn').onclick = toLessons;
+$('secondaryBtn').onclick = toLessons;
+$('actionBtn').onclick = () => {
+  if (phase === 'start' || phase === 'retry') startQuiz();
+  else if (phase === 'answer') check();
+  else nextQuestion();
+};
+
+/* Key handling is document-level and dereferences quiz-only nodes, so every
+   handler is gated on the quiz view owning the screen with a drill loaded:
+   on the list and progress views the keys must be inert. */
+const quizActive = () => document.body.dataset.view === 'drill' && !!DATA;
+
+document.addEventListener('keyup', e => { if (e.key === 'Enter') enterLocked = false; });
+document.addEventListener('keydown', e => {
+  if (!quizActive()) return;
+  if (e.key === 'Enter') {
+    if (enterLocked || $('actionBtn').disabled) return;
+    e.preventDefault();
+    $('actionBtn').click();
+    return;
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    // One step back per press: quiz or result -> this drill's lessons, lessons -> the list.
+    if (phase === 'start') location.hash = '#drills';
+    else toLessons();
+    return;
+  }
+  // Selection keys act only while a choice question awaits an answer; rewrite
+  // questions have no options, so digits typed into the input fall through here.
+  if (phase !== 'answer') return;
+  const opts = [...$('qbody').querySelectorAll('.duo-option')];
+  if (!opts.length) return;
+  if (/^[1-9]$/.test(e.key)) {
+    const i = +e.key - 1;
+    if (i < opts.length) { e.preventDefault(); select(i, $('qbody')); }
+  } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const d = e.key === 'ArrowDown' ? 1 : -1;
+    select(selected < 0 ? (d === 1 ? 0 : opts.length - 1) : (selected + d + opts.length) % opts.length, $('qbody'));
+  }
+});
+
+// Again once fonts and layout have settled: the first pass can measure short.
+window.addEventListener('load', fit);
+window.addEventListener('resize', fit);
 
 /* ---------- hash router ---------- */
 
@@ -217,8 +634,11 @@ function route() {
   ['drills', 'drill', 'progress'].forEach(v => $('view-' + v).classList.toggle('duo-hidden', v !== view));
   $('tab-drills').classList.toggle('is-active', view !== 'progress');
   $('tab-progress').classList.toggle('is-active', view === 'progress');
-  if (view === 'drills') loadDrills();
-  else if (view === 'drill') showDrill(arg);
+  if (view === 'drill') showDrill(arg);
+  else {
+    wantedFile = null;
+    if (view === 'drills') loadDrills();
+  }
 }
 
 window.addEventListener('hashchange', route);

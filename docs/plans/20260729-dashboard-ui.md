@@ -101,11 +101,14 @@ Key design decisions:
 - Modify: `dashboard/index.html`
 - Delete: `skills/drill/assets/drill-template.html`
 
-- [ ] port the lessons screen, quiz state machine (requeue-on-miss, progress bar, feedback), result screen, and the keyboard controls (digits/arrows/Enter/Esc, keycaps, Enter-lock) into the `#drill=<file>` view, loading the drill via `GET /api/drills/<file>`
-- [ ] gate all key handlers on the quiz view being active: Enter/digits/arrows are inert on `#drills` and `#progress` (the template's handlers are document-level and dereference quiz-only nodes - unguarded they throw or click hidden buttons)
-- [ ] back navigation: Esc during the quiz returns to the drill's lessons screen (today's behavior); Esc on the lessons screen navigates to `#drills` (new - today it is a no-op); the quiz card keeps the fixed-height footer behavior via `fit()` adapted to the view container, or a simpler equivalent that keeps the action button stationary
-- [ ] delete `skills/drill/assets/drill-template.html`
-- [ ] verify by replaying the full keyboard check sequence from PR #24 against the dashboard quiz (selection, wrap-around, out-of-range digits, post-check inertness, digits into the rewrite input, Esc to lessons) plus: a second Esc lands on `#drills`; pressing Enter and digits on the list and progress views changes nothing and logs no console errors; completing a quiz shows the result screen
+- [x] port the lessons screen, quiz state machine (requeue-on-miss, progress bar, feedback), result screen, and the keyboard controls (digits/arrows/Enter/Esc, keycaps, Enter-lock) into the `#drill=<file>` view, loading the drill via `GET /api/drills/<file>`
+- [x] gate all key handlers on the quiz view being active: Enter/digits/arrows are inert on `#drills` and `#progress` (the template's handlers are document-level and dereference quiz-only nodes - unguarded they throw or click hidden buttons)
+- [x] back navigation: Esc during the quiz returns to the drill's lessons screen (today's behavior); Esc on the lessons screen navigates to `#drills` (new - today it is a no-op); the quiz card keeps the fixed-height footer behavior via `fit()` adapted to the view container, or a simpler equivalent that keeps the action button stationary
+- [x] delete `skills/drill/assets/drill-template.html`
+- [x] verify by replaying the full keyboard check sequence from PR #24 against the dashboard quiz (selection, wrap-around, out-of-range digits, post-check inertness, digits into the rewrite input, Esc to lessons) plus: a second Esc lands on `#drills`; pressing Enter and digits on the list and progress views changes nothing and logs no console errors; completing a quiz shows the result screen
+- ! interim breakage accepted from the plan's ordering: `build_drill.py` (and the drill SKILL.md step that calls it) still reads the template deleted here, so the drill skill is broken on this branch until Task 6 replaces it with `prepare_drill.py`
+- note: the drill loaded into the quiz machine is cached by filename, so a tab switch to Progress and back does not reset a quiz in progress (the issue #26 core flow); a different `#drill=` file refetches
+- note: `place-items: center` on the drill view was replaced with `align-content: center` - justify-items shrank the shell to its content width instead of the 640px shell width
 
 ### Task 4: Quiz results persistence
 
