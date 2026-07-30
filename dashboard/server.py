@@ -58,7 +58,11 @@ def drill_summaries() -> list:
             continue
         if not isinstance(data, dict):
             continue
-        topics = data.get("topics") if isinstance(data.get("topics"), list) else []
+        topics = data.get("topics")
+        questions = data.get("questions")
+        # A card that opens into the "Drill unreadable" pane is worse than no card, so a session is listed only when it carries the two lists the drill view renders from.
+        if not isinstance(topics, list) or not topics or not isinstance(questions, list) or not questions:
+            continue
         out.append({
             "file": p.name,
             "kind": data.get("kind"),
@@ -112,6 +116,8 @@ class Handler(BaseHTTPRequestHandler):
             body = (APP_DIR / name).read_bytes()
         except OSError:
             return self.send_json({"error": "not found"}, 404)
+        # The page prints a restart command in every state where this server has stopped answering, and only the server knows which grammar home it was launched on. The placeholder stands where a JS string literal goes, so the path is substituted JSON-quoted, with < escaped so no path can close the script element.
+        body = body.replace(b'"__GRAMMAR_HOME__"', json.dumps(str(GRAMMAR_HOME)).encode("utf-8").replace(b"<", b"\\u003c"))
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
@@ -145,7 +151,9 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     return self.send_json(json.loads(p.read_text(encoding="utf-8")))
                 except (OSError, ValueError):
-                    pass
+                    # A file that is there but unreadable or not JSON must not answer 404: the page reads 404 as "Drill not found" and would deny a file the user can see in the folder.
+                    if p.is_file():
+                        return self.send_json({"error": "unreadable"}, 500)
             return self.send_json({"error": "not found"}, 404)
         return self.send_json({"error": "not found"}, 404)
 

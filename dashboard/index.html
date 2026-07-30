@@ -122,8 +122,9 @@ body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
   border: var(--duo-stroke) solid var(--duo-border);
   border-radius: var(--duo-radius-sm);
   padding: var(--duo-space-2) var(--duo-space-3);
-  overflow-x: auto;
-  white-space: nowrap;
+  /* The command carries an absolute grammar-home path, which can be longer than the card: wrapping keeps all of it on screen and copyable as one line, where a scroll box hides the tail behind a gesture nobody makes on a page they landed on because the server died. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* ---------- progress view (ported from the progress template) ---------- */
@@ -327,7 +328,9 @@ const el = (tag, cls, text) => {
   if (text !== undefined) n.textContent = text;
   return n;
 };
-const RESTART_CMD = 'python3 $GRAMMAR_HOME/dashboard/server.py';
+// The server substitutes the grammar home it serves into the placeholder, so the restart command names a real path: GRAMMAR_HOME lives in the hook's own process and is not set in the terminal the user pastes this into.
+const GRAMMAR_HOME = "__GRAMMAR_HOME__";
+const RESTART_CMD = `python3 "${GRAMMAR_HOME}/dashboard/server.py"`;
 
 async function fetchJSON(url) {
   const resp = await fetch(url);
@@ -344,7 +347,7 @@ function serverGoneMarkup() {
   return `<div class="duo-card duo-stack" data-state="server-gone">
     <h2 class="duo-heading">Server gone</h2>
     <p>The dashboard server is not answering. Restart it from a terminal, then reload this page:</p>
-    <div class="cmd">${RESTART_CMD}</div>
+    <div class="cmd">${esc(RESTART_CMD)}</div>
   </div>`;
 }
 
@@ -417,7 +420,19 @@ async function loadLastResult(file) {
   }
 }
 
-const usableDrill = d => !!d && typeof d === 'object' && Array.isArray(d.topics) && Array.isArray(d.questions) && d.questions.length > 0;
+// Every field the lesson and quiz screens dereference is checked here, not only the two lists: a hand-edited file that passes a shallow check throws mid-render and leaves a dead shell behind.
+const isText = v => typeof v === 'string';
+const usableTopic = t => !!t && typeof t === 'object' && isText(t.id) && isText(t.label)
+  && !!t.lesson && typeof t.lesson === 'object' && isText(t.lesson.summary)
+  && Array.isArray(t.lesson.examples) && t.lesson.examples.every(e => !!e && typeof e === 'object');
+const usableQuestion = q => !!q && typeof q === 'object' && isText(q.topic) && isText(q.prompt) && isText(q.explain)
+  && (q.type === 'choice'
+    ? Array.isArray(q.options) && q.options.length > 1 && q.options.every(isText) && Number.isInteger(q.answer) && q.answer >= 0 && q.answer < q.options.length
+    : q.type === 'rewrite' && Array.isArray(q.answers) && q.answers.length > 0 && q.answers.every(isText));
+const usableDrill = d => !!d && typeof d === 'object'
+  && Array.isArray(d.topics) && d.topics.length > 0 && d.topics.every(usableTopic)
+  && Array.isArray(d.questions) && d.questions.length > 0 && d.questions.every(usableQuestion)
+  && d.questions.every(q => d.topics.some(t => t.id === q.topic));
 
 async function showDrill(file) {
   wantedFile = file;
@@ -453,7 +468,7 @@ function showDrillError(file, reason) {
         <h2 class="duo-heading">${missing ? 'Drill not found' : 'Drill unreadable'}</h2>
         <p>${missing
           ? `The server has no drill named ${esc(file)}.`
-          : `${esc(file)} is not a drill this dashboard can open - it has no topics or no questions.`}</p>
+          : `${esc(file)} is not a drill this dashboard can open - its topics or its questions are missing or malformed.`}</p>
         <button class="duo-btn duo-btn--ghost" data-back>Back to drills</button>
       </div>`;
 }
@@ -759,8 +774,10 @@ async function saveResult(payload) {
     notice.innerHTML =
       `<div class="duo-feedback__title">Result not saved</div>` +
       `<div class="duo-feedback__note">The server did not accept it (${esc(e.message)}). Restart it and run the quiz again to record a score:</div>` +
-      `<div class="cmd" style="margin-top: var(--duo-space-2)">${RESTART_CMD}</div>`;
+      `<div class="cmd" style="margin-top: var(--duo-space-2)">${esc(RESTART_CMD)}</div>`;
     notice.classList.remove('duo-hidden');
+    // The result screen scrolls inside the card body and the notice is appended below the score, so on a short window it lands off screen unless it pulls itself into view.
+    notice.scrollIntoView({ block: 'nearest' });
   }
 }
 
@@ -995,7 +1012,7 @@ async function loadProgress() {
         'The hook has logged messages but has not flagged a single mistake to plot. Keep writing English in Claude Code - the chart appears with the first flagged mistake.'));
     }
     return progressMessage(emptyMarkup('no-dated', 'No dated mistakes yet',
-      `${PG.undated} logged mistake${PG.undated === 1 ? '' : 's'} carry no readable timestamp, so there is nothing to plot yet - write more English first.`));
+      `${PG.undated} logged mistake${PG.undated === 1 ? ' carries' : 's carry'} no readable timestamp, so there is nothing to plot yet - write more English first.`));
   }
   renderProgress();
 }
@@ -1046,7 +1063,7 @@ function renderProgress() {
   $('pgTable').replaceChildren(table);
 
   let note = 'Raw counts of flagged mistakes: a ' + PG.unit + ' with more written English naturally shows more mistakes.';
-  if (PG.undated > 0) note += ' ' + PG.undated + ' mistakes without a readable timestamp are not plotted.';
+  if (PG.undated > 0) note += ' ' + PG.undated + ' mistake' + (PG.undated === 1 ? ' without a readable timestamp is' : 's without a readable timestamp are') + ' not plotted.';
   $('pgNote').textContent = note;
 }
 
