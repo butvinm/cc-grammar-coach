@@ -24,15 +24,18 @@ export GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 python3 "$GRAMMAR_HOME/dashboard/server.py"
 ```
 
+Right after installing there is nothing at that path yet: the checker hook is what puts the app there, and it runs on messages you send in Claude Code. Send one message in a Claude Code session first (any message - the hook copies the app before it looks at your endpoint settings), or just ask for a drill and let the skill launch the dashboard for you; from then on the command above works from any terminal.
+
 It opens your browser at `http://127.0.0.1:8437/` and serves until you press Ctrl+C or close the terminal - there is no daemon and no autostart. Running it again while it is already up just reopens the tab. Set `GRAMMAR_DASHBOARD_PORT` if 8437 is taken. The drill, learn, and progress skills launch this same command, so a skill invocation and your own launch land on the same dashboard. The path is stable across plugin updates: the checker hook refreshes that copy of the app on every message on which it differs from the plugin's, so an update reaches the dashboard on your next message rather than your next session, and the same copy is what first appears after install.
 
 A server a skill started has no terminal of its own - it is a child of your Claude Code session and outlives the reply. Press Ctrl+C in the terminal that owns the server when there is one. Otherwise stop the single server holding the port you mean - it names its own process id, so nothing else you have running is touched:
 
 ```
-kill "$(curl -s http://127.0.0.1:8437/api/health | python3 -c 'import json, sys; print(json.load(sys.stdin)["pid"])')"
+PID=$(curl -s --noproxy 127.0.0.1 http://127.0.0.1:8437/api/health | python3 -c 'import json, sys; d = json.loads(sys.stdin.read() or "{}"); print(d.get("pid") or "" if d.get("app") == "cc-grammar-coach" else "")' 2>/dev/null)
+[ -n "$PID" ] && kill "$PID"
 ```
 
-Use the port you launched on if you set `GRAMMAR_DASHBOARD_PORT`. Stopping and relaunching is also how a server started before a plugin update picks up the refreshed app.
+It kills nothing when the port answers as something other than this dashboard, and `--noproxy` keeps an `http_proxy` in your environment from answering for localhost. Use the port you launched on if you set `GRAMMAR_DASHBOARD_PORT`. Stopping and relaunching is also how a server started before a plugin update picks up the refreshed app.
 
 ![The dashboard's session list, with a lesson and a drill](docs/img/dashboard-drills.png)
 
