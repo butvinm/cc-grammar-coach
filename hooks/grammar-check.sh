@@ -15,16 +15,19 @@ HISTORY_FILE="$GRAMMAR_HOME/history.jsonl"
 mkdir -p "$STATUS_DIR" "$GRAMMAR_HOME/dashboard"
 
 # Keep stable copies of the statusline scripts in GRAMMAR_HOME. The statusline runs outside the plugin sandbox and the versioned plugin-cache path changes on every update, so the wiring installed by /cc-grammar-coach:configure install-statusline points here instead and plugin updates propagate without re-wiring.
+# Every refresh lands on a temp file next to the target and is renamed into place: a statusline render or a running dashboard can read these at any moment, and rename swaps the whole file at once where cp would expose a half-written one. The pid in the temp name keeps two sessions refreshing at the same time off each other's file.
 for _f in render-grammar.sh grammar-statusline.sh; do
   if ! cmp -s "$PLUGIN_ROOT/statusline/$_f" "$GRAMMAR_HOME/$_f" 2>/dev/null; then
-    cp "$PLUGIN_ROOT/statusline/$_f" "$GRAMMAR_HOME/$_f" && chmod +x "$GRAMMAR_HOME/$_f"
+    _tmp="$GRAMMAR_HOME/.$_f.$$"
+    cp "$PLUGIN_ROOT/statusline/$_f" "$_tmp" && chmod +x "$_tmp" && mv -f "$_tmp" "$GRAMMAR_HOME/$_f" || rm -f "$_tmp"
   fi
 done
 
 # Same mechanism for the dashboard app: `python3 $GRAMMAR_HOME/dashboard/server.py` is the documented launch command, so the copy here - not the versioned plugin-cache path - is what the user bookmarks, and plugin updates propagate on the next message.
 for _f in server.py index.html duo.css; do
   if ! cmp -s "$PLUGIN_ROOT/dashboard/$_f" "$GRAMMAR_HOME/dashboard/$_f" 2>/dev/null; then
-    cp "$PLUGIN_ROOT/dashboard/$_f" "$GRAMMAR_HOME/dashboard/$_f"
+    _tmp="$GRAMMAR_HOME/dashboard/.$_f.$$"
+    cp "$PLUGIN_ROOT/dashboard/$_f" "$_tmp" && mv -f "$_tmp" "$GRAMMAR_HOME/dashboard/$_f" || rm -f "$_tmp"
   fi
 done
 
