@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import URLError
 from urllib.parse import unquote
-from urllib.request import urlopen
+from urllib.request import ProxyHandler, build_opener
 
 APP = "cc-grammar-coach"
 # Kept in step with .claude-plugin/plugin.json by hand - that manifest is the source of truth, and the launcher's version-skew notice compares this constant against the running server's. See the release step in CONTRIBUTING.md.
@@ -25,6 +25,7 @@ APP_DIR = Path(__file__).resolve().parent
 GRAMMAR_HOME = Path(os.environ.get("GRAMMAR_HOME", Path.home() / ".claude" / "cc-grammar-coach"))
 HOST_RE = re.compile(r"^(127\.0\.0\.1|localhost)(:\d+)?$")
 TS_RE = re.compile(r"^\d{4}-\d\d-\d\d")
+MAX_BODY = 1 << 20
 
 
 def read_jsonl(path: Path) -> list:
@@ -162,6 +163,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json({"error": "not found"}, 404)
         try:
             length = int(self.headers.get("Content-Length", ""))
+            # A negative length would turn the read into "until the client disconnects" and park this thread there; an absurd one would try to allocate it.
+            if not 0 <= length <= MAX_BODY:
+                raise ValueError
             obj = json.loads(self.rfile.read(length).decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             return self.send_json({"error": "malformed body"}, 400)
@@ -176,8 +180,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def probe(port: int):
+    # Bypass any http_proxy/HTTP_PROXY in the environment: the dashboard is always on this machine's loopback, and a reachable proxy answering for it would make a free port look taken and abort the launch.
+    opener = build_opener(ProxyHandler({}))
     try:
-        with urlopen(f"http://127.0.0.1:{port}/api/health", timeout=2) as resp:
+        with opener.open(f"http://127.0.0.1:{port}/api/health", timeout=2) as resp:
             info = json.loads(resp.read().decode("utf-8"))
         return info if isinstance(info, dict) and info.get("app") == APP else "foreign"
     except URLError as exc:

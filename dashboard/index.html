@@ -364,8 +364,8 @@ function lastResultByDrill(results) {
 function sessionCard(d, last) {
   const kind = d.kind === 'learn' ? 'learn' : 'drill';
   const chips = (d.topics || []).map(t =>
-    `<span class="duo-chip">${esc(t.label ?? '?')} &middot; ${t.count ? t.count + ' logged' : 'new topic'}</span>`).join('');
-  const score = last ? `<span class="session__score">${last.correct} / ${last.total}</span>` : '';
+    `<span class="duo-chip">${esc(t.label ?? '?')} &middot; ${t.count ? esc(t.count) + ' logged' : 'new topic'}</span>`).join('');
+  const score = last ? `<span class="session__score">${esc(last.correct)} / ${esc(last.total)}</span>` : '';
   return `<button class="session" data-file="${esc(d.file)}">
     <div class="session__top">
       <span class="kind kind--${kind}">${kind}</span>
@@ -469,7 +469,7 @@ function renderLessons() {
   $('drillTitle').textContent = DATA.kind === 'learn' ? 'New Lesson' : 'Grammar Drill';
   $('drillDate').textContent = DATA.date || '';
   $('chips').innerHTML = DATA.topics
-    .map(t => `<span class="duo-chip">${esc(t.label)} &middot; ${t.count ? t.count + ' logged' : 'new topic'}</span>`)
+    .map(t => `<span class="duo-chip">${esc(t.label)} &middot; ${t.count ? esc(t.count) + ' logged' : 'new topic'}</span>`)
     .join('');
   $('topics').innerHTML = DATA.topics.map(t => `
     <div class="duo-card duo-stack">
@@ -995,6 +995,10 @@ async function loadProgress() {
   }
   PG = aggregate(rows);
   if (!PG.events.length) {
+    if (!PG.undated) {
+      return progressMessage(emptyMarkup('no-mistakes', 'No mistakes flagged yet',
+        'The hook has logged messages but has not flagged a single mistake to plot. Keep writing English in Claude Code - the chart appears with the first flagged mistake.'));
+    }
     return progressMessage(emptyMarkup('no-dated', 'No dated mistakes yet',
       `${PG.undated} logged mistake${PG.undated === 1 ? '' : 's'} carry no readable timestamp, so there is nothing to plot yet - write more English first.`));
   }
