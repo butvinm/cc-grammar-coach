@@ -10,6 +10,9 @@
 /* Page-specific composition. Anything reusable belongs in duo.css instead. */
 * { box-sizing: border-box; }
 
+/* Every paragraph on this page sits inside a .duo-stack, which owns the vertical rhythm. */
+p { margin: 0; }
+
 body {
   min-height: 100vh;
   margin: 0;
@@ -54,18 +57,14 @@ body {
 .tab.is-active { color: var(--duo-info-ink); background: var(--duo-info-soft); }
 .tab:focus-visible { outline: 3px solid var(--duo-info); outline-offset: 2px; }
 
-/* Per-view layout: the list and progress views flow top-down under the tab bar;
-   only the quiz view centers its fixed-height card in the leftover viewport
-   (the place-items trap from PR #24 - centering must never grab tall flows).
-   align-content, not place-items: the shell must still stretch to the full
-   shell width, which justify-items: center would shrink to fit its content. */
+/* Per-view layout: the list and progress views flow top-down under the tab bar; only the quiz view centers its fixed-height card in the leftover viewport (the place-items trap from PR #24 - centering must never grab tall flows).
+   align-content, not place-items: the shell must still stretch to the full shell width, which justify-items: center would shrink to fit its content. */
 .view { width: 100%; max-width: var(--duo-shell-width); }
 body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
 
 /* ---------- quiz view (ported from the drill template) ---------- */
 
-/* One height for every screen, measured by fit(): the footer button must land on
-   the same pixel whichever screen is showing. */
+/* One height for every screen, measured by fit(): the footer button must land on the same pixel whichever screen is showing. */
 .duo-shell__body { height: var(--drill-body-h, 420px); }
 
 .screen { flex: 1; display: flex; flex-direction: column; gap: var(--duo-space-3); }
@@ -133,9 +132,7 @@ body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
 .pg-panel { display: flex; flex-direction: column; gap: var(--duo-space-3); }
 .pg-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--duo-space-2); }
 
-/* The plot: a 36px left gutter carries the y tick labels; hairline gridlines and
-   the band row are positioned over the same area so bars share the baseline,
-   which is the plot's bottom border. */
+/* The plot: a 36px left gutter carries the y tick labels; hairline gridlines and the band row are positioned over the same area so bars share the baseline, which is the plot's bottom border. */
 .pg-plot { position: relative; height: var(--pg-plot-h, 180px); border-bottom: 1px solid var(--duo-border); }
 .pg-grid-line { position: absolute; left: var(--pg-gutter, 36px); right: 0; border-top: 1px solid var(--duo-border); }
 .pg-grid-line span {
@@ -195,8 +192,7 @@ body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
 .pg-tablewrap { overflow-x: auto; margin-top: var(--duo-space-3); }
 .pg-table { border-collapse: collapse; width: 100%; font-size: var(--duo-text-sm); font-variant-numeric: tabular-nums; }
 .pg-table th, .pg-table td { padding: var(--duo-space-1) var(--duo-space-2); border-bottom: 1px solid var(--duo-border); text-align: right; }
-/* nowrap on the bucket column: the shell is narrower than the old standalone page,
-   which squeezed "Jul 24" onto two lines - the wrapper scrolls instead. */
+/* nowrap on the bucket column: the shell is narrower than the old standalone page, which squeezed "Jul 24" onto two lines - the wrapper scrolls instead. */
 .pg-table th:first-child, .pg-table td:first-child { text-align: left; white-space: nowrap; }
 .pg-table thead th { color: var(--duo-text-muted); font-size: var(--duo-text-xs); text-transform: uppercase; letter-spacing: 0.06em; }
 .pg-table tr:last-child td { font-weight: var(--duo-weight-bold); }
@@ -229,7 +225,7 @@ body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
         <div class="duo-stack duo-stack--tight">
           <h1 class="duo-title" id="drillTitle">Grammar Drill</h1>
           <div class="duo-muted" id="drillDate"></div>
-          <div class="duo-muted" style="font-size: var(--duo-text-sm)">Keyboard: number keys or &uarr;/&darr; pick an answer &middot; Enter checks &middot; Esc goes back</div>
+          <div class="duo-muted duo-small">Keyboard: number keys or &uarr;/&darr; pick an answer &middot; Enter checks &middot; Esc goes back</div>
         </div>
         <div class="duo-row" id="chips"></div>
         <div class="duo-stack duo-stack--loose" id="topics"></div>
@@ -255,7 +251,7 @@ body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
             <div class="duo-stat__value" id="statScore"></div>
           </div>
         </div>
-        <div class="duo-muted duo-hidden" style="text-align: center; font-size: var(--duo-text-sm)" id="prevAttempt"></div>
+        <div class="duo-muted duo-small duo-hidden" style="text-align: center" id="prevAttempt"></div>
         <div class="duo-feedback duo-feedback--bad duo-hidden" id="saveNotice"></div>
         <ul class="bytopic" id="byTopic"></ul>
         <div id="misses"></div>
@@ -315,7 +311,7 @@ body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
       <div class="pg-tablewrap" id="pgTable"></div>
     </details>
 
-    <div class="duo-muted" style="font-size: var(--duo-text-sm)" id="pgNote"></div>
+    <div class="duo-muted duo-small" id="pgNote"></div>
   </div>
 
   <div class="duo-hidden" id="progressMsg"></div>
@@ -323,8 +319,7 @@ body[data-view="drill"] .view { flex: 1; display: grid; align-content: center; }
 
 <script>
 const $ = id => document.getElementById(id);
-// textContent/innerHTML escapes & < > but leaves quotes, and one call site (the
-// session card's data-file) interpolates into an attribute, so quotes go too.
+// textContent/innerHTML escapes & < > but leaves quotes, and one call site (the session card's data-file) interpolates into an attribute, so quotes go too.
 const esc = s => { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML.replace(/"/g, '&quot;'); };
 const el = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -348,7 +343,7 @@ async function fetchJSON(url) {
 function serverGoneMarkup() {
   return `<div class="duo-card duo-stack" data-state="server-gone">
     <h2 class="duo-heading">Server gone</h2>
-    <p style="margin: 0">The dashboard server is not answering. Restart it from a terminal, then reload this page:</p>
+    <p>The dashboard server is not answering. Restart it from a terminal, then reload this page:</p>
     <div class="cmd">${RESTART_CMD}</div>
   </div>`;
 }
@@ -361,10 +356,12 @@ function lastResultByDrill(results) {
   return map;
 }
 
+// The list gets its labels from the summary endpoint, which passes through whatever the file held, so a topic with no label still renders a chip.
+const topicChip = t => `<span class="duo-chip">${esc(t.label ?? '?')} &middot; ${t.count ? esc(t.count) + ' logged' : 'new topic'}</span>`;
+
 function sessionCard(d, last) {
   const kind = d.kind === 'learn' ? 'learn' : 'drill';
-  const chips = (d.topics || []).map(t =>
-    `<span class="duo-chip">${esc(t.label ?? '?')} &middot; ${t.count ? esc(t.count) + ' logged' : 'new topic'}</span>`).join('');
+  const chips = (d.topics || []).map(topicChip).join('');
   const score = last ? `<span class="session__score">${esc(last.correct)} / ${esc(last.total)}</span>` : '';
   return `<button class="session" data-file="${esc(d.file)}">
     <div class="session__top">
@@ -381,14 +378,14 @@ async function loadDrills() {
   let drills, results;
   try {
     [drills, results] = await Promise.all([fetchJSON('/api/drills'), fetchJSON('/api/results')]);
-  } catch (e) {
+  } catch {
     list.innerHTML = serverGoneMarkup();
     return;
   }
   if (!drills.length) {
     list.innerHTML = `<div class="duo-card duo-stack" data-state="empty">
       <h2 class="duo-heading">No drills yet</h2>
-      <p class="duo-muted" style="margin: 0">Authored drills and lessons will show up here. Ask Claude for a grammar drill or a new lesson to create the first one.</p>
+      <p class="duo-muted">Authored drills and lessons will show up here. Ask Claude for a grammar drill or a new lesson to create the first one.</p>
     </div>`;
     return;
   }
@@ -403,19 +400,19 @@ $('drillsList').addEventListener('click', e => {
 
 /* ---------- drill view: lessons, quiz machine, result ---------- */
 
-// DATA is the drill JSON currently loaded into the quiz machine; loadedFile is the
-// file it came from. Keeping both means a tab switch and a return does not reset a
-// quiz in progress - the issue #26 core flow - while a different file reloads.
-// lastResult is the newest recorded attempt at loadedFile, shown on the result
-// screen as the previous score and replaced by each successful POST.
+// DATA is the drill JSON currently loaded into the quiz machine; loadedFile is the file it came from.
+// Keeping both means a tab switch and a return does not reset a quiz in progress - the issue #26 core flow - while a different file reloads.
+// lastResult is the newest recorded attempt at loadedFile, shown on the result screen as the previous score and replaced by each successful POST.
 let DATA = null, loadedFile = null, wantedFile = null, lastResult = null;
 
 const topicLabel = id => (DATA.topics.find(t => t.id === id) || { label: id }).label;
+// The answer a missed question is shown against: the right option, or the first accepted rewrite.
+const modelAnswer = q => q.type === 'choice' ? q.options[q.answer] : q.answers[0];
 
 async function loadLastResult(file) {
   try {
     return lastResultByDrill(await fetchJSON('/api/results')).get(file) || null;
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -430,13 +427,12 @@ async function showDrill(file) {
   try {
     [data, prev] = await Promise.all([fetchJSON('/api/drills/' + encodeURIComponent(file)), loadLastResult(file)]);
   } catch (e) {
-    if (wantedFile === file) showDrillError(file, e);
+    if (wantedFile === file) showDrillError(file, e.status === 404 ? 'missing' : e.status ? 'unreadable' : 'server-gone');
     return;
   }
   if (wantedFile !== file) return;
-  // A hand-edited or older-format file parses but has no screens to render, and
-  // the quiz machine would throw mid-render leaving a dead shell behind.
-  if (!usableDrill(data)) return showDrillError(file, { status: 422 });
+  // A hand-edited or older-format file parses but has no screens to render, and the quiz machine would throw mid-render leaving a dead shell behind.
+  if (!usableDrill(data)) return showDrillError(file, 'unreadable');
   DATA = data; loadedFile = file; lastResult = prev;
   $('drillError').classList.add('duo-hidden');
   $('drillShell').classList.remove('duo-hidden');
@@ -445,20 +441,21 @@ async function showDrill(file) {
   fit();
 }
 
-function showDrillError(file, err) {
+// reason is 'missing' (the server answered 404), 'unreadable' (it answered, but the file is not a drill this page can render) or 'server-gone' (nothing answered).
+function showDrillError(file, reason) {
   $('drillShell').classList.add('duo-hidden');
   const pane = $('drillError');
   pane.classList.remove('duo-hidden');
-  const missing = err.status === 404;
-  pane.innerHTML = err.status
-    ? `<div class="duo-card duo-stack" data-state="${missing ? 'drill-missing' : 'drill-unreadable'}">
+  const missing = reason === 'missing';
+  pane.innerHTML = reason === 'server-gone'
+    ? serverGoneMarkup()
+    : `<div class="duo-card duo-stack" data-state="${missing ? 'drill-missing' : 'drill-unreadable'}">
         <h2 class="duo-heading">${missing ? 'Drill not found' : 'Drill unreadable'}</h2>
-        <p style="margin: 0">${missing
+        <p>${missing
           ? `The server has no drill named ${esc(file)}.`
           : `${esc(file)} is not a drill this dashboard can open - it has no topics or no questions.`}</p>
         <button class="duo-btn duo-btn--ghost" data-back>Back to drills</button>
-      </div>`
-    : serverGoneMarkup();
+      </div>`;
 }
 
 $('drillError').addEventListener('click', e => {
@@ -468,13 +465,11 @@ $('drillError').addEventListener('click', e => {
 function renderLessons() {
   $('drillTitle').textContent = DATA.kind === 'learn' ? 'New Lesson' : 'Grammar Drill';
   $('drillDate').textContent = DATA.date || '';
-  $('chips').innerHTML = DATA.topics
-    .map(t => `<span class="duo-chip">${esc(t.label)} &middot; ${t.count ? esc(t.count) + ' logged' : 'new topic'}</span>`)
-    .join('');
+  $('chips').innerHTML = DATA.topics.map(topicChip).join('');
   $('topics').innerHTML = DATA.topics.map(t => `
     <div class="duo-card duo-stack">
       <h2 class="duo-heading">${esc(t.label)}</h2>
-      <p style="margin: 0">${esc(t.lesson.summary)}</p>
+      <p>${esc(t.lesson.summary)}</p>
       <div class="duo-stack">${t.lesson.examples.map(e => `
         <div class="duo-stack duo-stack--tight">
           <div class="duo-fix">
@@ -482,20 +477,17 @@ function renderLessons() {
             <span class="duo-fix__arrow">-&gt;</span>
             <span class="duo-fix__right">${esc(e.right)}</span>
           </div>
-          <div class="duo-muted" style="font-size: var(--duo-text-sm)">${esc(e.note)}</div>
+          <div class="duo-muted duo-small">${esc(e.note)}</div>
         </div>`).join('')}
       </div>
     </div>`).join('');
 }
 
 /* ---------- sizing ----------
- * The body height is fixed to the tallest question screen so the footer button
- * never moves across the quiz. Only questions are measured: the lessons and
- * result screens can be much taller, so they scroll inside the body (overflow-y)
- * rather than stretching every question to their height and leaving a dead gap.
- * Questions are measured with their feedback panel included, since that panel
- * appears inside the body. The available height comes from the view container's
- * top edge, not the whole viewport: the tab bar sits above it.
+ * The body height is fixed to the tallest question screen so the footer button never moves across the quiz.
+ * Only questions are measured: the lessons and result screens can be much taller, so they scroll inside the body (overflow-y) rather than stretching every question to their height and leaving a dead gap.
+ * Questions are measured with their feedback panel included, since that panel appears inside the body.
+ * The available height comes from the view container's top edge, not the whole viewport: the tab bar sits above it.
  */
 
 function screenMarkup(screen, inner) {
@@ -530,7 +522,7 @@ function questionMarkup(q) {
     `</div>` +
     `<div class="duo-feedback duo-bottom">` +
       `<div class="duo-feedback__title">x Not quite</div>` +
-      `<div class="duo-feedback__answer">${esc(q.type === 'choice' ? q.options[q.answer] : q.answers[0])}</div>` +
+      `<div class="duo-feedback__answer">${esc(modelAnswer(q))}</div>` +
       `<div class="duo-feedback__note">${esc(q.explain)}</div>` +
     `</div>`);
 }
@@ -550,9 +542,8 @@ function fit() {
 
 /* ---------- quiz ---------- */
 
-// queue holds question indices still to ask; a missed question is pushed back on
-// so it returns later in the same run. retired = answered right at least once,
-// which is what the progress bar measures (the queue length is not fixed).
+// queue holds question indices still to ask; a missed question is pushed back on so it returns later in the same run.
+// retired = answered right at least once, which is what the progress bar measures (the queue length is not fixed).
 let queue = [], current = -1, retired = new Set(), firstTry = new Map(), misses = [];
 let selected = -1, phase = 'start', enterLocked = false, posted = false;
 
@@ -668,7 +659,7 @@ function check() {
   if (ok) retired.add(current);
   else queue.push(current);
 
-  const model = q.type === 'choice' ? q.options[q.answer] : q.answers[0];
+  const model = modelAnswer(q);
   const fb = $('feedback');
   fb.className = 'duo-feedback duo-bottom' + (ok ? '' : ' duo-feedback--bad');
   fb.innerHTML =
@@ -678,10 +669,45 @@ function check() {
 
   setAction(queue.length ? 'Continue' : 'See result', { danger: !ok });
   phase = 'continue';
-  // A held Enter would otherwise fire Check and Continue back to back, wiping the
-  // feedback before it can be read. Unlock only on the next keyup.
+  // A held Enter would otherwise fire Check and Continue back to back, wiping the feedback before it can be read.
+  // Unlock only on the next keyup.
   enterLocked = true;
   setProgress(Math.round(100 * retired.size / DATA.questions.length));
+}
+
+function perTopicScores() {
+  const per = {};
+  DATA.questions.forEach((q, i) => {
+    if (!firstTry.has(i)) return;
+    per[q.topic] = per[q.topic] || { good: 0, total: 0 };
+    per[q.topic].total++;
+    if (firstTry.get(i)) per[q.topic].good++;
+  });
+  return per;
+}
+
+function byTopicMarkup(per) {
+  return Object.entries(per)
+    .map(([t, s]) => `<li><span>${esc(topicLabel(t))}</span><span>${s.good} / ${s.total}</span></li>`).join('');
+}
+
+function missesMarkup() {
+  if (!misses.length) return '';
+  return `<h3 class="duo-heading">Review</h3>` + misses.map(m =>
+    `<div class="miss duo-stack duo-stack--tight">` +
+      `<div class="duo-muted duo-small">${esc(m.q.prompt)}</div>` +
+      `<div class="duo-fix">` +
+        `<span class="duo-fix__wrong">${esc(m.given || '(blank)')}</span>` +
+        `<span class="duo-fix__arrow">-&gt;</span>` +
+        `<span class="duo-fix__right">${esc(modelAnswer(m.q))}</span>` +
+      `</div></div>`).join('');
+}
+
+function showPrevAttempt(prev) {
+  $('prevAttempt').classList.toggle('duo-hidden', !prev);
+  if (!prev) return;
+  const when = typeof prev.ts === 'string' ? prev.ts.slice(0, 10) : '';
+  $('prevAttempt').textContent = `Previous attempt: ${prev.correct} / ${prev.total}${when ? ' on ' + when : ''}`;
 }
 
 function showResult() {
@@ -698,40 +724,16 @@ function showResult() {
   $('trophy').innerHTML = pct === 100 ? '&#127942;' : pct >= 60 ? '&#127881;' : '&#128170;';
   $('resultTitle').textContent = pct === 100 ? 'Flawless' : pct >= 60 ? 'Lesson complete' : 'Keep drilling';
 
-  const per = {};
-  DATA.questions.forEach((q, i) => {
-    if (!firstTry.has(i)) return;
-    per[q.topic] = per[q.topic] || { good: 0, total: 0 };
-    per[q.topic].total++;
-    if (firstTry.get(i)) per[q.topic].good++;
-  });
-  $('byTopic').innerHTML = Object.entries(per)
-    .map(([t, s]) => `<li><span>${esc(topicLabel(t))}</span><span>${s.good} / ${s.total}</span></li>`).join('');
+  const per = perTopicScores();
+  $('byTopic').innerHTML = byTopicMarkup(per);
+  $('misses').innerHTML = missesMarkup();
+  // Rendered before saving: the POST replaces lastResult with this run's score.
+  showPrevAttempt(lastResult);
 
-  // Read before saving: the POST below replaces lastResult with this run's score.
-  const prev = lastResult;
-  $('prevAttempt').classList.toggle('duo-hidden', !prev);
-  if (prev) {
-    const when = typeof prev.ts === 'string' ? prev.ts.slice(0, 10) : '';
-    $('prevAttempt').textContent = `Previous attempt: ${prev.correct} / ${prev.total}${when ? ' on ' + when : ''}`;
-  }
   saveResult({ ts: localISO(), drill: loadedFile, total, correct: good, byTopic: per });
-
-  $('misses').innerHTML = misses.length === 0 ? '' :
-    `<h3 class="duo-heading">Review</h3>` + misses.map(m => {
-      const model = m.q.type === 'choice' ? m.q.options[m.q.answer] : m.q.answers[0];
-      return `<div class="miss duo-stack duo-stack--tight">` +
-        `<div class="duo-muted" style="font-size: var(--duo-text-sm)">${esc(m.q.prompt)}</div>` +
-        `<div class="duo-fix">` +
-          `<span class="duo-fix__wrong">${esc(m.given || '(blank)')}</span>` +
-          `<span class="duo-fix__arrow">-&gt;</span>` +
-          `<span class="duo-fix__right">${esc(model)}</span>` +
-        `</div></div>`;
-    }).join('');
 }
 
-// Offset-carrying timestamp, matching history.jsonl: the date a result belongs to
-// is the local one, which a UTC toISOString() shifts either side of midnight.
+// Offset-carrying timestamp, matching history.jsonl: the date a result belongs to is the local one, which a UTC toISOString() shifts either side of midnight.
 function localISO(d = new Date()) {
   const p = n => String(Math.floor(Math.abs(n))).padStart(2, '0');
   const off = -d.getTimezoneOffset();
@@ -770,10 +772,7 @@ $('actionBtn').onclick = () => {
   else nextQuestion();
 };
 
-/* Key handling is document-level and dereferences quiz-only nodes, so every
-   handler is gated on the drill view owning the screen, and everything past Esc
-   also on a drill being loaded: on the list and progress views the keys must be
-   inert, and on the drill view's error panes only Esc still steps back. */
+/* Key handling is document-level and dereferences quiz-only nodes, so every handler is gated on the drill view owning the screen, and everything past Esc also on a drill being loaded: on the list and progress views the keys must be inert, and on the drill view's error panes only Esc still steps back. */
 const drillView = () => document.body.dataset.view === 'drill';
 
 document.addEventListener('keyup', e => { if (e.key === 'Enter') enterLocked = false; });
@@ -793,8 +792,7 @@ document.addEventListener('keydown', e => {
     $('actionBtn').click();
     return;
   }
-  // Selection keys act only while a choice question awaits an answer; rewrite
-  // questions have no options, so digits typed into the input fall through here.
+  // Selection keys act only while a choice question awaits an answer; rewrite questions have no options, so digits typed into the input fall through here.
   if (phase !== 'answer') return;
   const opts = [...$('qbody').querySelectorAll('.duo-option')];
   if (!opts.length) return;
@@ -810,8 +808,7 @@ document.addEventListener('keydown', e => {
 
 // Again once fonts and layout have settled: the first pass can measure short.
 window.addEventListener('load', fit);
-// fit() measures every question by cloning it into the live DOM, so a drag of the
-// window edge would otherwise force a layout per question per resize event.
+// fit() measures every question by cloning it into the live DOM, so a drag of the window edge would otherwise force a layout per question per resize event.
 let fitTimer = 0;
 window.addEventListener('resize', () => {
   clearTimeout(fitTimer);
@@ -819,10 +816,9 @@ window.addEventListener('resize', () => {
 });
 
 /* ---------- progress: aggregation ----------
- * Ported from the standalone progress builder this view replaces. Dates are the ones the ts string
- * carries in its own offset - never a browser-local Date conversion, which drags a near-midnight
- * foreign-offset entry into the neighbouring day. Buckets are therefore held as
- * UTC midnight epochs: pure calendar arithmetic, no DST to step on.
+ * Ported from the standalone progress builder this view replaces.
+ * Dates are the ones the ts string carries in its own offset - never a browser-local Date conversion, which drags a near-midnight foreign-offset entry into the neighbouring day.
+ * Buckets are therefore held as UTC midnight epochs: pure calendar arithmetic, no DST to step on.
  */
 
 const DAY = 86400000;
@@ -833,8 +829,7 @@ const sum = a => a.reduce((x, y) => x + y, 0);
 /* Even maxima keep the mid tick an integer. */
 const niceMax = m => m <= 10 ? Math.max(2, 2 * Math.ceil(m / 2)) : 10 * Math.ceil(m / 10);
 
-// d = the calendar date the string names; at = the real instant, needed only by
-// the last-7-days window (a date-only string means local midnight, as in Python).
+// d = the calendar date the string names; at = the real instant, needed only by the last-7-days window (a date-only string means local midnight, as in Python).
 function tsParts(ts) {
   if (typeof ts !== 'string') return null;
   const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(ts);
@@ -880,6 +875,7 @@ function aggregate(rows) {
   const first = events.reduce((a, e) => Math.min(a, e.d), Infinity);
   const last = events.reduce((a, e) => Math.max(a, e.d), -Infinity);
   const spanDays = (last - first) / DAY;
+  // Both thresholds are the same ceiling of about 60 bars in the plot - 60 days, then 420 / 7 = 60 weeks - after which the next unit takes over.
   const unit = spanDays <= 60 ? 'day' : spanDays <= 420 ? 'week' : 'month';
 
   const buckets = bucketSeq(first, last, unit);
@@ -963,8 +959,7 @@ function pgChart(values, labels, yMax, name, ticks) {
 
 /* ---------- progress: view ---------- */
 
-// PG is the aggregate currently on screen, recomputed from the live log on every
-// visit to the tab - the chart is a pure function of history.jsonl.
+// PG is the aggregate currently on screen, recomputed from the live log on every visit to the tab - the chart is a pure function of history.jsonl.
 let PG = null;
 
 function progressMessage(html) {
@@ -976,7 +971,7 @@ function progressMessage(html) {
 function emptyMarkup(state, heading, body) {
   return `<div class="duo-card duo-stack" data-state="${state}">
     <h2 class="duo-heading">${heading}</h2>
-    <p class="duo-muted" style="margin: 0">${body}</p>
+    <p class="duo-muted">${body}</p>
   </div>`;
 }
 
@@ -984,7 +979,7 @@ async function loadProgress() {
   let rows;
   try {
     rows = await fetchJSON('/api/history');
-  } catch (e) {
+  } catch {
     PG = null;
     return progressMessage(serverGoneMarkup());
   }
@@ -1062,9 +1057,8 @@ function route() {
   let view = 'drills', arg = null;
   if (h.startsWith('#drill=')) {
     const raw = h.slice('#drill='.length);
-    // A hand-typed hash can hold a broken escape; decoding it must not abort the
-    // router, or the page would silently keep whatever view it had.
-    try { arg = decodeURIComponent(raw); } catch (e) { arg = raw; }
+    // A hand-typed hash can hold a broken escape; decoding it must not abort the router, or the page would silently keep whatever view it had.
+    try { arg = decodeURIComponent(raw); } catch { arg = raw; }
     if (arg) view = 'drill';
   } else if (h === '#progress') view = 'progress';
   document.body.dataset.view = view;

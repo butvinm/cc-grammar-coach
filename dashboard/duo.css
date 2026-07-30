@@ -1,8 +1,7 @@
 /* Duo UI - a small design system for lesson-style quiz interfaces.
  *
- * Drop this file in, then compose the markup from .duo-* classes. Everything is
- * driven by custom properties on :root, so a consuming project can reskin the
- * whole system by overriding the token block and nothing else.
+ * Drop this file in, then compose the markup from .duo-* classes.
+ * Everything is driven by custom properties on :root, so a consuming project can reskin the whole system by overriding the token block and nothing else.
  *
  * Every length comes from the 8px spacing scale. No component invents a value.
  */
@@ -46,8 +45,7 @@
   --duo-surface: #ffffff;
   --duo-text: #3c3c3c;
 
-  /* Derived roles - shadow is the pressed edge, soft is the panel fill,
-     ink is legible text on top of soft. */
+  /* Derived roles - shadow is the pressed edge, soft is the panel fill, ink is legible text on top of soft. */
   --duo-brand-shadow: #46a302;
   --duo-brand-soft: #d7ffb8;
   --duo-brand-ink: #4a9e00;
@@ -85,8 +83,8 @@
 
 /* ---------- page frame ---------- */
 
-/* The lesson frame: header, scrolling body, fixed footer. The footer's height
-   never varies, which is what keeps its button anchored between screens. */
+/* The lesson frame: header, scrolling body, fixed footer.
+   The footer's height never varies, which is what keeps its button anchored between screens. */
 .duo-shell {
   width: 100%;
   max-width: var(--duo-shell-width);
@@ -98,8 +96,7 @@
   overflow: hidden;
 }
 
-/* Height comes from the token, not from the children: a consumer that hides the
-   close button on some screens must not get a header that changes height. */
+/* Height comes from the token, not from the children: a consumer that hides the close button on some screens must not get a header that changes height. */
 .duo-shell__header {
   display: flex;
   align-items: center;
@@ -352,6 +349,7 @@
 .duo-heading { font-size: var(--duo-text-lg); font-weight: var(--duo-weight-heavy); margin: 0; }
 .duo-prompt { font-size: var(--duo-text-lg); font-weight: var(--duo-weight-heavy); margin: 0; line-height: 1.35; }
 .duo-muted { color: var(--duo-text-muted); }
+.duo-small { font-size: var(--duo-text-sm); }
 
 /* A correction reads as one line, not two columns: wrong -> right. */
 .duo-fix { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--duo-space-2); }
