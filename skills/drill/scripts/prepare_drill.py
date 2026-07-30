@@ -19,6 +19,15 @@ def fail(msg: str) -> None:
     sys.exit(1)
 
 
+def is_int(v) -> bool:
+    # bool is a subclass of int, so a JSON `true` would pass a plain isinstance check as an answer index and then match no option in the quiz, which compares the selected index with ===.
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def is_str(v) -> bool:
+    return isinstance(v, str) and bool(v.strip())
+
+
 def validate(data: dict) -> None:
     if not isinstance(data.get("topics"), list) or not data["topics"]:
         fail("'topics' must be a non-empty list")
@@ -26,35 +35,48 @@ def validate(data: dict) -> None:
         fail("'questions' must be a non-empty list")
     topic_ids = set()
     for t in data["topics"]:
+        if not isinstance(t, dict):
+            fail(f"topic must be an object: {t}")
         for key in ("id", "label", "count", "lesson"):
             if key not in t:
                 fail(f"topic missing '{key}': {t}")
-        if not isinstance(t["count"], int) or t["count"] < 0:
+        if not is_str(t["id"]) or not is_str(t["label"]):
+            fail(f"topic 'id' and 'label' must be non-empty strings: {t}")
+        if not is_int(t["count"]) or t["count"] < 0:
             fail(f"topic '{t['id']}' 'count' must be a non-negative integer")
         if not isinstance(t["lesson"], dict):
             fail(f"topic '{t['id']}' 'lesson' must be an object")
-        if not t["lesson"].get("summary") or not t["lesson"].get("examples"):
-            fail(f"topic '{t['id']}' lesson needs 'summary' and 'examples'")
+        if not is_str(t["lesson"].get("summary")) or not isinstance(t["lesson"].get("examples"), list) or not t["lesson"]["examples"]:
+            fail(f"topic '{t['id']}' lesson needs a 'summary' string and a non-empty 'examples' list")
         for e in t["lesson"]["examples"]:
+            if not isinstance(e, dict):
+                fail(f"example in topic '{t['id']}' must be an object: {e}")
             for key in ("wrong", "right", "note"):
                 if key not in e:
                     fail(f"example in topic '{t['id']}' missing '{key}'")
+                if not is_str(e[key]):
+                    fail(f"example in topic '{t['id']}' needs a non-empty string '{key}'")
         topic_ids.add(t["id"])
     for q in data["questions"]:
+        if not isinstance(q, dict):
+            fail(f"question must be an object: {q}")
         for key in ("topic", "type", "prompt", "explain"):
             if key not in q:
                 fail(f"question missing '{key}': {q}")
-        if q["topic"] not in topic_ids:
+        if not is_str(q["topic"]) or q["topic"] not in topic_ids:
             fail(f"question topic '{q['topic']}' has no matching topic id")
+        if not is_str(q["prompt"]) or not is_str(q["explain"]):
+            fail(f"question 'prompt' and 'explain' must be non-empty strings: {q}")
         if q["type"] == "choice":
             opts = q.get("options")
-            if not isinstance(opts, list) or len(opts) < 2:
-                fail(f"choice question needs >= 2 options: {q['prompt']}")
-            if not isinstance(q.get("answer"), int) or not 0 <= q["answer"] < len(opts):
+            if not isinstance(opts, list) or len(opts) < 2 or not all(is_str(o) for o in opts):
+                fail(f"choice question needs >= 2 options, all non-empty strings: {q['prompt']}")
+            if not is_int(q.get("answer")) or not 0 <= q["answer"] < len(opts):
                 fail(f"choice question needs a valid 'answer' index: {q['prompt']}")
         elif q["type"] == "rewrite":
-            if not isinstance(q.get("answers"), list) or not q["answers"]:
-                fail(f"rewrite question needs a non-empty 'answers' list: {q['prompt']}")
+            answers = q.get("answers")
+            if not isinstance(answers, list) or not answers or not all(is_str(a) for a in answers):
+                fail(f"rewrite question needs a non-empty 'answers' list of non-empty strings: {q['prompt']}")
         else:
             fail(f"unknown question type '{q['type']}': {q['prompt']}")
 
