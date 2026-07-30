@@ -36,7 +36,7 @@ LLM_BASE_URL="${CLAUDE_PLUGIN_OPTION_LLM_BASE_URL:-}"
 LLM_MODEL="${CLAUDE_PLUGIN_OPTION_LLM_MODEL:-openai/gpt-oss-120b}"
 LLM_API_KEY="${CLAUDE_PLUGIN_OPTION_LLM_API_KEY:-}"
 
-# The checker needs a configured endpoint; without credentials there is nothing to call, so stop after the statusline-copy refresh above.
+# The checker needs a configured endpoint; without credentials there is nothing to call, so stop here - after both copy refreshes above, which is what keeps the statusline scripts and the dashboard app current even for a user who never configures an endpoint.
 { [ -n "$LLM_BASE_URL" ] && [ -n "$LLM_API_KEY" ]; } || exit 0
 
 # --- parse stdin (one python pass: session_id on line 1, then the raw prompt) ---
