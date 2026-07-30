@@ -17,7 +17,7 @@ The server is a dumb file layer: it reads and appends, and computes nothing per 
 | Route                    | Returns                                                                                                                       |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
 | `GET /` , `GET /duo.css` | the two app files from the server's own directory; no other path maps to the filesystem                                       |
-| `GET /api/health`        | `{"app": "cc-grammar-coach", "version": ..., "home": "<GRAMMAR_HOME>"}` - the marker the launcher probes                      |
+| `GET /api/health`        | `{"app": "cc-grammar-coach", "version": ..., "home": "<GRAMMAR_HOME>", "pid": ...}` - the marker the launcher probes          |
 | `GET /api/history`       | `history.jsonl` rows as an array; unparsable and non-object lines are skipped                                                 |
 | `GET /api/drills`        | newest-first summaries `{file, kind, date, topics: [{label, count}]}` over `drills/*.json`; legacy `drills/*.html` is ignored |
 | `GET /api/drills/<file>` | one drill JSON; only a `.json` basename resolves, anything else 404s                                                          |
@@ -27,6 +27,10 @@ The server is a dumb file layer: it reads and appends, and computes nothing per 
 A `results.jsonl` line is `{"ts": "<offset-carrying ISO timestamp>", "drill": "<file name in drills/>", "total": N, "correct": N, "byTopic": {"<topic id>": {"good": N, "total": N}}}`. `ts` carries the local offset like `history.jsonl` does, so a near-midnight attempt buckets on the day it was taken.
 
 Two guards, both because the port is fixed and documented and the log is personal: every request must address the server as `127.0.0.1`/`localhost` (DNS-rebinding guard), and the one write endpoint additionally demands an `application/json` body and a local `Origin` when the browser sends one, so a page on another site cannot post fabricated scores.
+
+Several dashboards can be up at once - `GRAMMAR_DASHBOARD_PORT` exists for exactly that, and the launcher already handles a port held by a dashboard serving a different grammar home. So no stop instruction anywhere in this repo may match on a command line (`pkill -f dashboard/server.py` kills all of them, including servers the user is still using). Stop a dashboard with Ctrl+C in its own terminal, or by the `pid` its `/api/health` reports for the port in question; the launcher's version-skew notice prints that pid itself.
+
+Markup in `index.html` is built two ways and new code picks one on purpose: `el(tag, cls, text)` for anything assembled from data or needing events (the chart, the table), template strings with `esc()` on every interpolation for the fixed panels ported from the old templates (the list card, the lessons, the feedback and result blocks). Prefer `el()` when adding a view - it cannot forget to escape - and if you extend a template-string block, `esc()` every value you interpolate, including numbers.
 
 ## Releasing
 

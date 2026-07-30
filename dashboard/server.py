@@ -24,6 +24,8 @@ VERSION = "0.6.0"
 APP_DIR = Path(__file__).resolve().parent
 GRAMMAR_HOME = Path(os.environ.get("GRAMMAR_HOME", Path.home() / ".claude" / "cc-grammar-coach"))
 HOST_RE = re.compile(r"^(127\.0\.0\.1|localhost)(:\d+)?$")
+# probe() returns the health dict of our own server, this sentinel when something else holds the port, or None when the port is free. A sentinel, not a string: `is FOREIGN` cannot be spelled wrong the way a `== "foreign"` typo could, which would fall through to starting a server on an occupied port.
+FOREIGN = object()
 TS_RE = re.compile(r"^\d{4}-\d\d-\d\d")
 MAX_BODY = 1 << 20
 
@@ -128,7 +130,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/duo.css":
             return self.send_app_file("duo.css", "text/css; charset=utf-8")
         if path == "/api/health":
-            return self.send_json({"app": APP, "version": VERSION, "home": str(GRAMMAR_HOME)})
+            # pid identifies this one server: several dashboards can run at once on different ports, so every stop instruction has to name a process rather than match a command line.
+            return self.send_json({"app": APP, "version": VERSION, "home": str(GRAMMAR_HOME), "pid": os.getpid()})
         if path == "/api/history":
             return self.send_json(read_jsonl(GRAMMAR_HOME / "history.jsonl"))
         if path == "/api/results":
@@ -185,11 +188,11 @@ def probe(port: int):
     try:
         with opener.open(f"http://127.0.0.1:{port}/api/health", timeout=2) as resp:
             info = json.loads(resp.read().decode("utf-8"))
-        return info if isinstance(info, dict) and info.get("app") == APP else "foreign"
+        return info if isinstance(info, dict) and info.get("app") == APP else FOREIGN
     except URLError as exc:
-        return None if isinstance(getattr(exc, "reason", None), ConnectionRefusedError) else "foreign"
+        return None if isinstance(getattr(exc, "reason", None), ConnectionRefusedError) else FOREIGN
     except (OSError, ValueError):
-        return "foreign"
+        return FOREIGN
 
 
 def main() -> None:
@@ -211,14 +214,17 @@ def main() -> None:
             print(f"port {port} is held by a dashboard serving {home or 'an unknown grammar home'}, not {GRAMMAR_HOME}; stop that server or set GRAMMAR_DASHBOARD_PORT to a free port and relaunch", file=sys.stderr)
             sys.exit(1)
         if running.get("version") != VERSION:
-            print(f"dashboard already running at {url} with version {running.get('version')} (local copy is {VERSION}); stop it (Ctrl+C in its terminal, or pkill -f dashboard/server.py) and relaunch to pick up the update")
+            # A server old enough to skew may predate the pid field, and only then is there no process to name.
+            pid = running.get("pid")
+            how = f"Ctrl+C in its terminal, or kill {pid}" if is_int(pid) else "Ctrl+C in its terminal"
+            print(f"dashboard already running at {url} with version {running.get('version')} (local copy is {VERSION}); stop it ({how}) and relaunch to pick up the update")
         else:
             print(f"dashboard already running at {url}")
         if not args.no_open:
             webbrowser.open(url)
         sys.exit(0)
     busy = f"port {port} is in use by another program; set GRAMMAR_DASHBOARD_PORT to a free port and relaunch"
-    if running == "foreign":
+    if running is FOREIGN:
         print(busy, file=sys.stderr)
         sys.exit(1)
     try:
