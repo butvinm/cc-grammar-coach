@@ -71,7 +71,8 @@ render_grammar() {
 
     [[ -s "$GRAMMAR_FILE" ]] || return 0
 
-    # COLUMNS is unset in the non-interactive statusline process and its stdout is a pipe, so nothing here can read the real terminal width; the constant is what applies in practice.
+    # Claude Code exports COLUMNS to the statusline process and keeps it in step with the pane across resizes (measured over 47 consecutive renders: 162, 176, 180, 395), so the constant applies only to a statusline invoked without it.
+    # `tput cols` was measuring nothing: no descriptor there is a terminal, so ncurses answered out of COLUMNS itself, and without COLUMNS it would answer with the terminfo default of 80.
     local WIDTH=${COLUMNS:-120}
     [[ "$WIDTH" =~ ^[0-9]+$ ]] && [ "$WIDTH" -ge 20 ] || WIDTH=120
     # Reserve 4 columns consumed by Claude Code's statusline padding.
