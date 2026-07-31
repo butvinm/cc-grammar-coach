@@ -23,14 +23,14 @@ input=$(cat)
 # ... your existing statusline segments ...
 
 # grammar segment:
-SID=$(printf '%s' "$input" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("session_id") or "default")')
+[[ "$input" =~ \"session_id\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]] && SID="${BASH_REMATCH[1]}"
 if [ -f "$HOME/.claude/cc-grammar-coach/render-grammar.sh" ]; then
     . "$HOME/.claude/cc-grammar-coach/render-grammar.sh"
-    render_grammar "$SID"
+    render_grammar "${SID:-default}"
 fi
 ```
 
-`render_grammar` prints nothing when there is no feedback for the session, and the `-f` guard keeps your statusline safe if the plugin is uninstalled, so the segment is harmless to leave in place permanently.
+`render_grammar` prints nothing when there is no feedback for the session, and the `-f` guard keeps your statusline safe if the plugin is uninstalled, so the segment is harmless to leave in place permanently. Everything on the statusline path is bash builtins: the segment re-renders every couple of seconds, so it spawns no interpreter and no subprocess, and `bash` is the only thing it needs installed.
 
 ## State directory (`GRAMMAR_HOME`)
 

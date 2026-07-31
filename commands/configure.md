@@ -61,14 +61,14 @@ Follow these steps:
    - **Existing statusline script**: read the script it points to and append the grammar segment at the end, adapted to how that script already handles stdin (statusline commands receive a JSON object on stdin whose `session_id` field is the key; the script may have it captured in a variable, e.g. `input=$(cat)`, or you may need to capture it first). Before writing, save a backup next to the script as `<name>.bak` and show the user the exact addition. The canonical form to adapt:
 
      ```bash
-     GRAMMAR_SID=$(printf '%s' "$input" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("session_id") or "default")' 2>/dev/null)
+     [[ "$input" =~ \"session_id\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]] && GRAMMAR_SID="${BASH_REMATCH[1]}"
      if [ -f "$HOME/.claude/cc-grammar-coach/render-grammar.sh" ]; then
          . "$HOME/.claude/cc-grammar-coach/render-grammar.sh"
          render_grammar "${GRAMMAR_SID:-default}"
      fi
      ```
 
-     `render_grammar` prints nothing when there is no feedback for the session, and the `-f` guard keeps the script safe if the plugin is uninstalled, so the segment is harmless to leave in permanently.
+     `render_grammar` prints nothing when there is no feedback for the session, and the `-f` guard keeps the script safe if the plugin is uninstalled, so the segment is harmless to leave in permanently. The snippet needs `bash`, as `render-grammar.sh` itself does; a statusline running under `sh` has to be switched to `bash` first.
 
    - **Inline command string** (a command that is not a path to an editable script file): do not try to splice into it. Explain the situation and ask the user whether to move the inline command into a script file (e.g. `~/.claude/statusline.sh`, referenced from settings) and wire that, or to leave things unchanged.
 
