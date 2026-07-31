@@ -11,7 +11,7 @@ An English grammar coach for Claude Code, in two parts:
 
 The checker runs on every message automatically: it reviews the message, appends any mistakes to the log the drill practices from, and - if the statusline is wired - shows one of:
 
-- `✔ Looks good` - clean message, one short compliment.
+- `✔ "not because of" - a clean contrast.` - clean message, one compliment about this message: it names the construction you got right, so the praise doubles as reinforcement rather than a stock verdict.
 - `<wrong> → <fix> (<rule>: <why>)` - one line per grammar error.
 - `✨ <rephrase>` - a more natural rewrite of the whole message: offered after the error lines when the fixes alone would not make it read natively, or alone - in place of the praise - when the message is grammatically correct but phrased in a way no native would use; the `rephrase` setting turns this line off.
 

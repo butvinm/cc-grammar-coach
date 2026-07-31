@@ -206,7 +206,8 @@ if has_content:
     open(status_path, "w", encoding="utf-8").write("\n".join(parts))
 else:
     compliment = praise[praise.find("✔") + 1:].strip() if praise else ""
-    if not compliment or len(compliment) > 50 or len(lines) > 1:
+    # The prompt asks for at most 70 characters, but the ceiling here is a sanity guard against a paragraph, not the target: a message-anchored compliment that overshoots by a few words is still worth more than the generic fallback, and the statusline soft-wraps it.
+    if not compliment or len(compliment) > 120 or len(lines) > 1:
         compliment = "Looks good"
     open(status_path, "w", encoding="utf-8").write("✔ " + compliment)
 ')
