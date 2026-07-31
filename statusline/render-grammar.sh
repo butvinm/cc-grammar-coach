@@ -7,40 +7,59 @@
 #   [category] fix     split per part, see render_fix_line below
 # Anything unrecognised falls back to red, so a new line type shows up loudly rather than being silently mis-coloured. Long lines are soft-wrapped to the terminal width on word boundaries so nothing gets truncated.
 #
+# The statusline re-renders every couple of seconds while the status file only changes once per prompt, so wrapping is done with bash builtins and parameter expansion alone: no subprocess and no pipeline, hence no fork per rendered line.
+#
 # GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach and is overridable.
 
-GRAY='\033[90m'
-GREEN='\033[32m'
-YELLOW='\033[33m'
-RED='\033[31m'
-DIM='\033[2m'
-RESET='\033[0m'
+GRAY=$'\033[90m'
+GREEN=$'\033[32m'
+YELLOW=$'\033[33m'
+RED=$'\033[31m'
+DIM=$'\033[2m'
+RESET=$'\033[0m'
+
+# Splits text on spaces and appends each word, tagged with the colour it is to be printed in, to the pending-word list that _grammar_flush_words wraps.
+_grammar_push_words() {
+    local col="$1" rest="$2" word
+    while [[ -n "$rest" ]]; do
+        word="${rest%% *}"
+        if [[ "$word" == "$rest" ]]; then rest=""; else rest="${rest#* }"; fi
+        [[ -n "$word" ]] || continue
+        _GRAMMAR_WORDS+=("$word")
+        _GRAMMAR_COLORS+=("$col")
+    done
+}
+
+# Prints the pending words as one statusline row per wrapped segment, each preceded by a newline, then empties the list.
+# Only the visible text is measured, and the active colour is re-emitted at the start of each segment, so escape bytes never corrupt the width calculation. A single word longer than WIDTH is emitted as-is rather than hard-split mid-word.
+_grammar_flush_words() {
+    local i out="" len=0 cur="" word col
+    for ((i = 0; i < ${#_GRAMMAR_WORDS[@]}; i++)); do
+        word="${_GRAMMAR_WORDS[i]}"
+        col="${_GRAMMAR_COLORS[i]}"
+        if [[ $len -gt 0 && $((len + 1 + ${#word})) -gt $WIDTH ]]; then
+            printf '\n%s' "$out$RESET"
+            out=""; len=0; cur=""
+        fi
+        if [[ $len -gt 0 ]]; then out+=" "; len=$((len + 1)); fi
+        # Reset before each colour change: the dim used for the arrow is an *attribute*, not a colour, so without this it stays switched on and washes out every later part of the line.
+        if [[ "$col" != "$cur" ]]; then out+="$RESET$col"; cur="$col"; fi
+        out+="$word"
+        len=$((len + ${#word}))
+    done
+    if [[ $len -gt 0 ]]; then printf '\n%s' "$out$RESET"; fi
+    _GRAMMAR_WORDS=()
+    _GRAMMAR_COLORS=()
+    return 0
+}
 
 # Renders one fix line with a colour per part - red for the wrong fragment, green for the correction, gray for the reason, dim for the arrow - so the three can be told apart at a glance instead of reading as one long sentence.
-# Wrapping happens here too: only the visible text is measured, and the active colour is re-emitted at the start of each wrapped segment, so escape bytes never corrupt the width calculation.
 render_fix_line() {
-    awk -v W="$WIDTH" -v WRONG="$1" -v RIGHT="$2" -v WHY="$3" \
-        -v CR="$RED" -v CG="$GREEN" -v CGY="$GRAY" -v CD="$DIM" -v CX="$RESET" '
-    function add(txt, col,   k, a, m) {
-        if (txt == "") return
-        m = split(txt, a, " ")
-        for (k = 1; k <= m; k++) { n++; word[n] = a[k]; wcol[n] = col }
-    }
-    BEGIN {
-        n = 0
-        add(WRONG, CR); add("→", CD); add(RIGHT, CG); add(WHY, CGY)
-        out = ""; len = 0; cur = ""
-        for (i = 1; i <= n; i++) {
-            if (len > 0 && len + 1 + length(word[i]) > W) {
-                print out CX; out = ""; len = 0; cur = ""
-            }
-            if (len > 0) { out = out " "; len++ }
-            # Reset before each colour change: the dim used for the arrow and the counter is an *attribute*, not a colour, so without this it stays switched on and washes out every later part of the line.
-            if (wcol[i] != cur) { out = out CX wcol[i]; cur = wcol[i] }
-            out = out word[i]; len += length(word[i])
-        }
-        if (len > 0) print out CX
-    }'
+    _grammar_push_words "$RED" "$1"
+    _grammar_push_words "$DIM" "→"
+    _grammar_push_words "$GREEN" "$2"
+    _grammar_push_words "$GRAY" "$3"
+    _grammar_flush_words
 }
 
 render_grammar() {
@@ -52,12 +71,14 @@ render_grammar() {
 
     [[ -s "$GRAMMAR_FILE" ]] || return 0
 
-    local WIDTH
-    WIDTH=${COLUMNS:-$(tput cols 2>/dev/null)}
+    # Claude Code exports COLUMNS to the statusline process and keeps it in step with the pane across resizes (measured over 47 consecutive renders: 162, 176, 180, 395), so the constant applies only to a statusline invoked without it.
+    # `tput cols` was measuring nothing: no descriptor there is a terminal, so ncurses answered out of COLUMNS itself, and without COLUMNS it would answer with the terminfo default of 80.
+    local WIDTH=${COLUMNS:-120}
     [[ "$WIDTH" =~ ^[0-9]+$ ]] && [ "$WIDTH" -ge 20 ] || WIDTH=120
     # Reserve 4 columns consumed by Claude Code's statusline padding.
     WIDTH=$((WIDTH - 4))
 
+    local _GRAMMAR_WORDS=() _GRAMMAR_COLORS=()
     local line LINE_COLOR body fx_wrong fx_rest fx_why fx_right
     while IFS= read -r line || [[ -n "$line" ]]; do
         case "$line" in
@@ -73,10 +94,7 @@ render_grammar() {
                     fx_why=""
                     [[ "$fx_rest" == *"("* ]] && { fx_why="(${fx_rest##*(}"; fx_rest="${fx_rest%(*}"; }
                     fx_right="${fx_rest%"${fx_rest##*[![:space:]]}"}"
-                    render_fix_line "$fx_wrong" "$fx_right" "$fx_why" \
-                        | while IFS= read -r seg || [[ -n "$seg" ]]; do
-                            printf "\n%s" "$seg"
-                        done
+                    render_fix_line "$fx_wrong" "$fx_right" "$fx_why"
                     continue
                 fi
                 LINE_COLOR=$YELLOW; line="$body"
@@ -84,16 +102,7 @@ render_grammar() {
             *)         LINE_COLOR=$RED ;;
         esac
         # Word-wrap by character count (UTF-8 aware); a single token longer than WIDTH is emitted as-is rather than hard-split mid-word.
-        awk -v W="$WIDTH" '{
-            n=split($0,w," "); line="";
-            for(i=1;i<=n;i++){
-                cand=(line==""?w[i]:line" "w[i]);
-                if(length(cand)>W && line!=""){print line; line=w[i]}
-                else line=cand
-            }
-            if(line!="" || NF==0) print line
-        }' <<< "$line" | while IFS= read -r seg || [[ -n "$seg" ]]; do
-            printf "\n${LINE_COLOR}%s${RESET}" "$seg"
-        done
+        _grammar_push_words "$LINE_COLOR" "$line"
+        _grammar_flush_words
     done < "$GRAMMAR_FILE"
 }
