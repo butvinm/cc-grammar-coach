@@ -12,6 +12,7 @@ Scoring is per class and never pooled:
   - natural-silent     a clean, natural message must receive praise only - no fixes AND no rephrase; scored as a false-positive rate over both signals
   - silent-rephrase    the typo/name silence classes must not acquire rephrases now that the model may rephrase without error lines; their rephrase rate has its own ceiling
   - praise-generic     every ✔ line written in the run must be anchored to its own message (issue #25); a stock verdict or a phrase reused across two different messages is scored generic, and the generic rate has a ceiling
+  - praise-unlogged    a displayed compliment must also reach history.jsonl as a praise entry, so the drill can count what the user gets right; deterministic given the model output, so the ceiling is zero
 
 Exit code is non-zero when any gate fails (silence classes must stay under a false-positive-rate ceiling; recall must clear a flagged-any floor and a pooled exact-category floor), so CI and the plan's Task 8 can gate.
 
@@ -130,7 +131,7 @@ def load_cases(path):
 def run_hook(message, case_id, selection=None):
     """Invoke the shipped hook once for one message in a fresh GRAMMAR_HOME.
 
-    Returns (flagged, categories, rephrase_count, dup_rephrases, praise). flagged is whether the isolated history.jsonl recorded any fix (the authoritative signal for fixes - history is the file the drill learns from); categories is the set of category slugs seen; rephrase_count is how many logged lines carried a rephrase, and dup_rephrases lists the ones that are near-duplicates of the fixes reapplied (must be empty - the hook filters them). praise is the text after the ✔ marker in the isolated status file, or None when the run produced no praise line; the status file is the only place praise appears, because a praised message is by definition mistake-free and never reaches history.jsonl.
+    Returns (flagged, categories, rephrase_count, dup_rephrases, praise, praise_unlogged). flagged is whether the isolated history.jsonl recorded any fix (the authoritative signal for fixes - history is the file the drill learns from); categories is the set of category slugs seen; rephrase_count is how many logged lines carried a rephrase, and dup_rephrases lists the ones that are near-duplicates of the fixes reapplied (must be empty - the hook filters them). praise is the text after the ✔ marker in the isolated status file, or None when the run produced no praise line; it is read from the status file rather than the logged praise entry because the status file is what the user reads, so scoring it covers the display path including the Looks good substitution.
 
     selection="full" enables the whole catalog by writing enabled-categories.txt into the isolated GRAMMAR_HOME, so recall cases for categories outside the default selection can be scored; without it the hook runs on the shipped default selection, which is what the silence gates are calibrated for.
     """
@@ -158,6 +159,7 @@ def run_hook(message, case_id, selection=None):
         fixes = []
         rephrase_count = 0
         dup_rephrases = []
+        logged_praise = []
         history_path = os.path.join(home, "history.jsonl")
         if os.path.exists(history_path):
             with open(history_path, encoding="utf-8") as fh:
@@ -176,6 +178,8 @@ def run_hook(message, case_id, selection=None):
                         rephrase_count += 1
                         if rephrase_similarity(obj.get("message", ""), line_fixes, rephrase) >= DUP_RATIO:
                             dup_rephrases.append(rephrase)
+                    if obj.get("praise"):
+                        logged_praise.append(obj["praise"])
 
         praise = None
         status_path = os.path.join(home, "status", case_id)
@@ -185,8 +189,11 @@ def run_hook(message, case_id, selection=None):
                     praise = line[line.find(CHECK) + 1:].strip()
                     break
 
+        # The displayed compliment and the logged one come from the same branch of the hook, so they must agree exactly; a drift means a praised message left no trace for the drill to count, which no other gate can see.
+        praise_unlogged = praise is not None and logged_praise[-1:] != [praise]
+
         categories = {f.get("category", "") for f in fixes}
-        return bool(fixes), categories, rephrase_count, dup_rephrases, praise
+        return bool(fixes), categories, rephrase_count, dup_rephrases, praise, praise_unlogged
     finally:
         shutil.rmtree(home, ignore_errors=True)
 
@@ -346,6 +353,16 @@ def evaluate(results):
         lines.append("      -> FAIL: generic-praise rate %.0f%% exceeds ceiling %.0f%% (the praise line is boilerplate, not feedback about the message)"
                      % (praise_rate * 100, MAX_PRAISE_GENERIC_RATE * 100))
 
+    # Zero-tolerance like rephrase-dup, and for the same reason: given the model output, the hook writes the status file and the log line in one branch, so a displayed compliment missing from history.jsonl is a code regression rather than model noise.
+    unlogged = [(r["case"]["id"], r["praise_unlogged"]) for r in results if r.get("praise_unlogged")]
+    lines.append("  praise-unlogged        %d praise line(s) displayed but not logged  (ceiling 0)"
+                 % sum(n for _cid, n in unlogged))
+    for cid, n in unlogged:
+        lines.append("      LOST %-8s [%d sample(s)]" % (cid, n))
+    if unlogged:
+        ok = False
+        lines.append("      -> FAIL: a compliment reached the statusline without reaching history.jsonl (the drill cannot count what the user gets right)")
+
     return lines, ok
 
 
@@ -441,6 +458,15 @@ def run_selftest():
         print("SELFTEST BROKEN: distinct message-anchored compliments must not trip any gate")
         return 2
 
+    print("SELFTEST: a compliment shown but never logged must fail on its own\n")
+    lost = [dict(anchored[0], praise_unlogged=1)]
+    lost_lines, lost_ok = evaluate(lost)
+    print("\n".join(lost_lines))
+    print()
+    if lost_ok or not any("praise-unlogged" in l and "ceiling 0" in l for l in lost_lines):
+        print("SELFTEST BROKEN: an unlogged praise line did not trip the gate")
+        return 2
+
     print("SELFTEST OK: gate returned failure as expected; exiting non-zero")
     return 1
 
@@ -484,10 +510,11 @@ def main():
         rephrase_count = 0
         dup_rephrases = []
         praises = []
+        praise_unlogged = 0
         seen = set()
         noisy_count = 0
         for _ in range(repeats):
-            flagged, categories, rephrases, dups, praise = run_hook(case["message"], case["id"], case.get("selection"))
+            flagged, categories, rephrases, dups, praise, unlogged = run_hook(case["message"], case["id"], case.get("selection"))
             if flagged:
                 flag_count += 1
             if flagged or rephrases:
@@ -498,11 +525,14 @@ def main():
             dup_rephrases.extend(dups)
             if praise:
                 praises.append(praise)
+            if unlogged:
+                praise_unlogged += 1
             seen |= categories
         results.append({"case": case, "runs": repeats,
                         "flag_count": flag_count, "exact_count": exact_count,
                         "rephrase_count": rephrase_count, "dup_rephrases": dup_rephrases,
-                        "praises": praises, "noisy_count": noisy_count})
+                        "praises": praises, "praise_unlogged": praise_unlogged,
+                        "noisy_count": noisy_count})
         mark = "flag" if flag_count else ("reph" if rephrase_count else "silent")
         suffix = "  (%d/%d flagged)" % (flag_count, repeats) if repeats > 1 else ""
         print("  [%2d/%d] %-8s %-8s %s%s" % (i, len(cases), case["class"][:8], mark, case["id"], suffix))

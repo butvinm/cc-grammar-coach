@@ -19,7 +19,7 @@ Grammar home defaults to `~/.claude/cc-grammar-coach` and is overridden by `$GRA
 GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 ```
 
-- `$GRAMMAR_HOME/history.jsonl` - the checker hook's mistake log, one JSON object per non-clean message: `{"ts", "message", "fixes": [{"category", "wrong", "fix", "rule"}], "rephrase"?}`. Used here only to personalize the lesson.
+- `$GRAMMAR_HOME/history.jsonl` - the checker hook's log, one JSON object per reviewed message: `{"ts", "message", "fixes": [{"category", "wrong", "fix", "rule"}], "rephrase"?, "praise"?}`. A clean message is logged with an empty `fixes` list and a `praise` key, so a line is evidence of a mistake only when `fixes[]` has content. Used here only to personalize the lesson.
 - `$GRAMMAR_HOME/curriculum.tsv` - one `<iso-week>\t<topic-id>` line per taught topic; may not exist yet.
 
 ## Building the lesson
@@ -28,7 +28,7 @@ GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 
 2. If a line for the current week exists, review that week's topic with a fresh quiz - the pace is one new topic per week, enforced here, not by a scheduler. Otherwise take the first topic from `references/syllabus.md` not yet listed in the file and append `<iso-week>\t<topic-id>` (create the file and its parent dir if missing).
 
-3. Personalize: scan `history.jsonl` for the topic's constructions - both `fixes[]` on that category and `message` text using or conspicuously avoiding it - to see whether the user misuses or avoids the construction, and work that evidence into the lesson.
+3. Personalize: scan `history.jsonl` for the topic's constructions - `fixes[]` on that category, `message` text using or conspicuously avoiding it, and `praise` lines naming it - to see whether the user misuses, avoids, or already handles the construction, and work that evidence into the lesson.
 
 4. Build the drill data. Read `${CLAUDE_PLUGIN_ROOT}/skills/drill/references/authoring.md` for the data schema and question-writing rules, then author:
    - The single topic gets `count: 0` (the page renders it as "new topic") and a 3-5 sentence lesson - new material needs more setup than remediation - with 6-8 `questions`.
