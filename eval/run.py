@@ -63,6 +63,19 @@ def norm_praise(text):
     return " ".join(norm_words(text))
 
 
+# A praise line is a quoted fragment plus a label. The label is the half that can teach: "correct definite article usage" only repeats the bracket tag the error lines already print, while "definite because you named it above" is a rule the user can apply next time. Strip the quotes and a label that is nothing but "correct <category words>" is the degenerate form; matched over the run, it is the metric that says whether the praise explains anything.
+PRAISE_QUOTE = re.compile(r'["‘’“”\'](.+?)["‘’“”\']')
+CATEGORY_LABEL = re.compile(r"^(correct|proper|good|nice|right)\b[\w\s‑-]*$", re.I)
+
+
+def praise_label(text):
+    return PRAISE_QUOTE.sub("", text).strip(" -.–—").strip()
+
+
+def is_category_label(text):
+    return bool(CATEGORY_LABEL.match(praise_label(text)))
+
+
 def apply_fixes(message, fixes):
     corrected = message
     for f in fixes:
@@ -97,6 +110,8 @@ MIN_REPHRASE_RECALL = float(os.environ.get("GRAMMAR_EVAL_MIN_REPHRASE_RECALL", "
 MAX_SILENT_REPHRASE_RATE = float(os.environ.get("GRAMMAR_EVAL_MAX_SILENT_REPHRASE_RATE", "0.25"))
 # Generic-praise ceiling (issue #25). Baseline sampling of gpt-oss-120b on the pre-#25 prompt scored ~100% generic (20 live samples drew on six stock verdicts, "Clean and natural." alone taking half of them), so any ceiling below 1.0 separates the old prompt from the new one. It sits at the same 0.25 as the silence ceilings because the residue is the same kind of noise: two unrelated messages can honestly earn the same construction praise ("question inversion"), and that collision costs both samples.
 MAX_PRAISE_GENERIC_RATE = float(os.environ.get("GRAMMAR_EVAL_MAX_PRAISE_GENERIC_RATE", "0.25"))
+# Category-label ceiling: the share of praise lines whose label only names the category instead of stating the rule. A matched A/B over the same 34 messages put the prompt before the rule-teaching wording at 74% and after it at 26%, so 0.5 separates them with margin on both sides. It is deliberately permissive rather than tight: a three-word imperative may genuinely have no rule worth teaching, and forcing one would invite invention.
+MAX_PRAISE_CATEGORY_RATE = float(os.environ.get("GRAMMAR_EVAL_MAX_PRAISE_CATEGORY_RATE", "0.5"))
 
 
 def forward_creds(env):
@@ -353,6 +368,17 @@ def evaluate(results):
         lines.append("      -> FAIL: generic-praise rate %.0f%% exceeds ceiling %.0f%% (the praise line is boilerplate, not feedback about the message)"
                      % (praise_rate * 100, MAX_PRAISE_GENERIC_RATE * 100))
 
+    category_labels = [(cid, text) for cid, text in praise_samples if is_category_label(text)]
+    cat_rate = len(category_labels) / len(praise_samples) if praise_samples else 0.0
+    lines.append("  praise-category-label  %d/%d labels only name the category  (%.0f%%, ceiling %.0f%%)"
+                 % (len(category_labels), len(praise_samples), cat_rate * 100, MAX_PRAISE_CATEGORY_RATE * 100))
+    for cid, text in category_labels:
+        lines.append("      CAT %-8s %s %s" % (cid, CHECK, text))
+    if cat_rate > MAX_PRAISE_CATEGORY_RATE:
+        ok = False
+        lines.append("      -> FAIL: %.0f%% of praise labels only name the category (the line repeats the bracket tag instead of teaching the rule)"
+                     % (cat_rate * 100))
+
     # Zero-tolerance like rephrase-dup, and for the same reason: given the model output, the hook writes the status file and the log line in one branch, so a displayed compliment missing from history.jsonl is a code regression rather than model noise.
     unlogged = [(r["case"]["id"], r["praise_unlogged"]) for r in results if r.get("praise_unlogged")]
     lines.append("  praise-unlogged        %d praise line(s) displayed but not logged  (ceiling 0)"
@@ -456,6 +482,24 @@ def run_selftest():
     _, anchored_ok = evaluate(anchored)
     if not anchored_ok:
         print("SELFTEST BROKEN: distinct message-anchored compliments must not trip any gate")
+        return 2
+
+    print("SELFTEST: labels that only name the category must fail, rule-teaching labels must pass\n")
+    fake_cat = [{"case": {"id": "st-c%d" % i, "class": "natural-silent", "message": "clean %d" % i},
+                 "runs": 1, "flag_count": 0, "exact_count": 0, "noisy_count": 0,
+                 "praises": ['"fragment %d" - correct definite article usage %d' % (i, i)]}
+                for i in range(3)]
+    cat_lines, cat_ok = evaluate(fake_cat)
+    print("\n".join(cat_lines))
+    print()
+    if cat_ok or not any("only name the category" in l and "FAIL" in l for l in cat_lines):
+        print("SELFTEST BROKEN: category-only labels did not trip the gate")
+        return 2
+    rules = [dict(r, praises=['"fragment %d" - definite because you named it above %d' % (i, i)])
+             for i, r in enumerate(fake_cat)]
+    _, rules_ok = evaluate(rules)
+    if not rules_ok:
+        print("SELFTEST BROKEN: labels stating a rule must not trip any gate")
         return 2
 
     print("SELFTEST: a compliment shown but never logged must fail on its own\n")
