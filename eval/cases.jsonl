@@ -53,3 +53,7 @@
 {"id": "nt01", "source": "real", "class": "natural-silent", "message": "Looks good to me, let me check the logs and get back to you tomorrow"}
 {"id": "nt02", "source": "real", "class": "natural-silent", "message": "I reviewed the PR and left two comments, everything else looks fine"}
 {"id": "nt03", "source": "synthetic", "class": "natural-silent", "message": "Can you take a look at the failing test when you have some time today"}
+{"id": "nt04", "source": "synthetic", "class": "natural-silent", "message": "If the retry budget runs out, we should fail fast instead of hanging"}
+{"id": "nt05", "source": "synthetic", "class": "natural-silent", "message": "I have not managed to reproduce it locally yet, but the trace looks clear"}
+{"id": "nt06", "source": "synthetic", "class": "natural-silent", "message": "I would rather split this into two smaller pull requests"}
+{"id": "nt07", "source": "synthetic", "class": "natural-silent", "message": "The build has been failing since we bumped the parser dependency"}

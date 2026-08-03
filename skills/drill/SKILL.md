@@ -19,7 +19,7 @@ Grammar home defaults to `~/.claude/cc-grammar-coach` and is overridden by `$GRA
 GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 ```
 
-The mistake log is `$GRAMMAR_HOME/history.jsonl` - one JSON object per line, appended by the checker hook, one line per non-clean message. There is no other log; do not grep any legacy file. Each line:
+The mistake log is `$GRAMMAR_HOME/history.jsonl` - one JSON object per line, appended by the checker hook, one line per reviewed message. There is no other log; do not grep any legacy file. A clean message is logged too, with an empty `fixes` list and a `praise` key, so never treat the presence of a line as evidence of a mistake. Each line:
 
 ```json
 {
@@ -33,11 +33,12 @@ The mistake log is `$GRAMMAR_HOME/history.jsonl` - one JSON object per line, app
       "rule": "<why, short>"
     }
   ],
-  "rephrase": "<a more natural rewrite of the whole message, or the key is absent>"
+  "rephrase": "<a more natural rewrite of the whole message, or the key is absent>",
+  "praise": "<the compliment shown for a clean message; present only when fixes is empty and no rephrase was offered>"
 }
 ```
 
-Use it two ways: `fixes[].category` ranks recent weak spots, and a line's presence pre-filters which messages actually contained mistakes. Re-read `message` (with its `fixes`) as the source material for lesson examples.
+Use it two ways: `fixes[].category` ranks recent weak spots, and a non-empty `fixes[]` pre-filters which messages actually contained mistakes. Re-read `message` (with its `fixes`) as the source material for lesson examples. Lines carrying `praise` are the clean messages; they are not drill material, but they are the denominator that says how often the user gets a category right.
 
 ## Building the drill
 
@@ -58,10 +59,11 @@ Use it two ways: `fixes[].category` ranks recent weak spots, and a line's presen
        except (KeyError, ValueError):
            return False
    window = [r for r in rows if in_window(r)]
-   # Widen to the last 200 lines when the 7-day window holds fewer than 30 fixes;
-   # line order is the only recency signal for entries without a usable ts.
+   # Widen to the last 200 mistake lines when the 7-day window holds fewer than 30 fixes;
+   # line order is the only recency signal for entries without a usable ts, and clean
+   # messages are logged too, so widen over the lines that carry fixes rather than all lines.
    if sum(len(r.get("fixes", [])) for r in window) < 30:
-       window = rows[-200:]
+       window = [r for r in rows if r.get("fixes")][-200:]
    counts = collections.Counter(f["category"] for r in window for f in r.get("fixes", []))
    for cat, n in counts.most_common():
        print(f"{n}\t{cat}")

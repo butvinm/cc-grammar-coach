@@ -189,26 +189,30 @@ if rephrase is not None:
 
 has_content = bool(fix_lines) or rephrase is not None
 
-if has_content:
-    obj = {
-        "ts": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-        "message": msg,
-        "fixes": fixes,
-    }
-    if rephrase:
-        obj["rephrase"] = rephrase
-    sys.stdout.write(json.dumps(obj, ensure_ascii=False))
+# Every reviewed message is logged, clean ones included: a praise entry carries an empty fixes list and a praise key, so what the user got right accumulates the same way mistakes do. Readers that only want mistakes must test fixes[] for content instead of treating every line as a mistake.
+obj = {
+    "ts": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+    "message": msg,
+    "fixes": fixes,
+}
 
 if has_content:
+    if rephrase:
+        obj["rephrase"] = rephrase
     parts = list(fix_lines)
     if rephrase:
         parts.append("✨ " + rephrase)
     open(status_path, "w", encoding="utf-8").write("\n".join(parts))
 else:
     compliment = praise[praise.find("✔") + 1:].strip() if praise else ""
-    if not compliment or len(compliment) > 50 or len(lines) > 1:
+    # The prompt asks for at most 70 characters, but the ceiling here is a sanity guard against a paragraph, not the target: a message-anchored compliment that overshoots by a few words is still worth more than the generic fallback, and the statusline soft-wraps it.
+    if not compliment or len(compliment) > 120 or len(lines) > 1:
         compliment = "Looks good"
+    # The fallback is logged as it was displayed rather than dropped: a run where the model returned no usable compliment is data about the checker, and the entry still counts as one clean message.
+    obj["praise"] = compliment
     open(status_path, "w", encoding="utf-8").write("✔ " + compliment)
+
+sys.stdout.write(json.dumps(obj, ensure_ascii=False))
 ')
   [ -n "$JLINE" ] && printf '%s\n' "$JLINE" >> "$HISTORY_FILE"
 ) > /dev/null 2>&1 &

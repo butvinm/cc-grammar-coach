@@ -11,7 +11,7 @@ An English grammar coach for Claude Code, in two parts:
 
 The checker runs on every message automatically: it reviews the message, appends any mistakes to the log the drill practices from, and - if the statusline is wired - shows one of:
 
-- `✔ Looks good` - clean message, one short compliment.
+- `✔ "not because of" - a clean contrast.` - clean message, one compliment about this message: it names the construction you got right, so the praise doubles as reinforcement rather than a stock verdict.
 - `<wrong> → <fix> (<rule>: <why>)` - one line per grammar error.
 - `✨ <rephrase>` - a more natural rewrite of the whole message: offered after the error lines when the fixes alone would not make it read natively, or alone - in place of the praise - when the message is grammatically correct but phrased in a way no native would use; the `rephrase` setting turns this line off.
 
@@ -76,7 +76,7 @@ Details in [docs/mistake-categories.md](docs/mistake-categories.md).
 
 ## How it works
 
-The hook sends each English message to the configured model in the background, so feedback lands in the statusline a few seconds later and never delays your turn. The judge is a model held to a narrow spec, not a rule engine: it flags only clear-cut grammar errors in your enabled categories and stays quiet on everything else - word choice, typos, code identifiers, quoted fragments, disabled categories, and non-English or very short/long messages. It errs toward silence, and the occasional borderline call that slips through still feeds the drill, so nothing is lost. Every flagged mistake is appended to a local log under `~/.claude/cc-grammar-coach/`, which is what the drill practices from.
+The hook sends each English message to the configured model in the background, so feedback lands in the statusline a few seconds later and never delays your turn. The judge is a model held to a narrow spec, not a rule engine: it flags only clear-cut grammar errors in your enabled categories and stays quiet on everything else - word choice, typos, code identifiers, quoted fragments, disabled categories, and non-English or very short/long messages. It errs toward silence, and the occasional borderline call that slips through still feeds the drill, so nothing is lost. Every reviewed message is appended to a local log under `~/.claude/cc-grammar-coach/`: a message with mistakes carries its fixes, which is what the drill practices from, and a clean one carries the compliment it earned, so what you get right is recorded as well as what you get wrong.
 
 ## License
 
