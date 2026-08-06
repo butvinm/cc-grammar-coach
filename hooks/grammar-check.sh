@@ -47,6 +47,15 @@ STATUS_FILE="$STATUS_DIR/$SID"
 : > "$STATUS_FILE"
 find "$STATUS_DIR" -type f -mtime +1 -delete 2>/dev/null
 
+# A drill in progress silences the checker. Quiz answers are exercise sentences aimed at a rule the user is being taught, not organic writing, and logging them would both distort history.jsonl and feed the drill its own output - skills/drill ranks topics over the same fixes[] it would be writing. The flag is created and removed by the drill and learn skills; the staleness cap is what keeps a session abandoned mid-quiz from muting the checker forever, and 60 minutes is well past any drill and well short of a day of unchecked writing.
+DRILL_FLAG="$GRAMMAR_HOME/drill-active"
+if [ -e "$DRILL_FLAG" ]; then
+  if [ -n "$(find "$DRILL_FLAG" -mmin -60 2>/dev/null)" ]; then
+    exit 0
+  fi
+  rm -f "$DRILL_FLAG"
+fi
+
 [ -z "$PROMPT" ] && exit 0
 case "$PROMPT" in /*) exit 0 ;; esac
 [ "${#PROMPT}" -lt "$MIN_CHARS" ] && exit 0

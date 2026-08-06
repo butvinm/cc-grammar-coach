@@ -1,11 +1,11 @@
 ---
 name: drill
-description: Build a personalized English grammar lesson and interactive quiz as a local web page from the grammar-check hook's mistake log. Invoke when the user asks for a grammar drill, quiz, or practice on their mistakes.
+description: Run a personalized English grammar lesson and quiz in the session, built from the grammar-check hook's mistake log. Invoke when the user asks for a grammar drill, quiz, or practice on their mistakes.
 ---
 
 # Drill
 
-Turn the mistakes logged by the grammar-check hook into a lesson-plus-quiz web page grounded in the user's own sentences.
+Turn the mistakes logged by the grammar-check hook into a lesson and a quiz grounded in the user's own sentences, taught here in the conversation.
 
 The user's native language is `${user_config.native_language}`. When it is set, contrast English rules with the habits that language causes (for example a language with no articles, freer word order, or aspect instead of tense variety). When it is empty, give generic English lessons and do not assume any nationality.
 
@@ -48,10 +48,18 @@ Use it two ways: `fixes[].category` ranks recent weak spots, and a non-empty `fi
    python3 - "$GRAMMAR_HOME/history.jsonl" <<'PY'
    import collections, datetime, json, sys
    path = sys.argv[1]
+   rows = []
    try:
-       rows = [json.loads(l) for l in open(path, encoding="utf-8") if l.strip()]
+       for line in open(path, encoding="utf-8"):
+           if not line.strip():
+               continue
+           # A malformed line is skipped, not fatal: the log is appended by a backgrounded subshell, and one truncated write must not cost the whole ranking.
+           try:
+               rows.append(json.loads(line))
+           except json.JSONDecodeError:
+               pass
    except FileNotFoundError:
-       rows = []
+       pass
    cutoff = datetime.datetime.now().astimezone() - datetime.timedelta(days=7)
    def in_window(r):
        try:
@@ -77,29 +85,23 @@ Use it two ways: `fixes[].category` ranks recent weak spots, and a non-empty `fi
 2. Pull the lesson material for the chosen categories. Read `$GRAMMAR_HOME/history.jsonl` again and collect, per chosen category, the `wrong`/`fix` pairs and the surrounding `message` from lines whose `fixes[]` include that category. Skip messages that read as deliberate mistake-planting to test the checker (long unnatural strings of stacked errors). These are the pool for lesson examples.
 
 3. Build the drill data. Read `${CLAUDE_PLUGIN_ROOT}/skills/drill/references/authoring.md` for the data schema and question-writing rules, then author:
+   - `kind: "drill"`.
    - Per topic: a lesson with a 2-4 sentence rule explanation aimed at a speaker of the user's native language (generic if it is unset), and 2-4 `examples` taken from the user's own logged mistakes (shorten long sentences to the relevant fragment). `count` is the number of fixes you counted for that topic in the ranking window (not lifetime).
    - 4-6 `questions` per topic.
 
-4. Write the data to a JSON file in the scratchpad, then run the builder from the plugin root:
+4. Write the data to a JSON file in the scratchpad, then store the session from the plugin root:
 
    ```
-   python3 "${CLAUDE_PLUGIN_ROOT}/skills/drill/scripts/build_drill.py" <data.json>
+   python3 "${CLAUDE_PLUGIN_ROOT}/skills/drill/scripts/prepare_drill.py" <data.json>
    ```
 
-   The script validates the data, inlines `assets/duo.css` into `assets/drill-template.html`, writes `$GRAMMAR_HOME/drills/drill-<date>-<HHMM>.html`, and prints the path. It never opens the page, so rebuilding to inspect the markup does not spawn a browser. Then open the printed path portably - `open` on macOS, `xdg-open` on Linux, and if neither exists just report the path:
+   The script validates the data, writes `$GRAMMAR_HOME/drills/drill-<date>-<HHMM>.json`, and prints the path. The file is what outlives this conversation: the same session can be re-run or reported on later.
+
+5. Open with one line naming what is being drilled and why, then run the quiz. Read `${CLAUDE_PLUGIN_ROOT}/skills/drill/references/running-a-quiz.md` and follow it - it covers the checker flag, the one-question-at-a-time loop, semantic grading, and how to record the result.
 
    ```
-   if command -v open >/dev/null 2>&1; then open "<path>"
-   elif command -v xdg-open >/dev/null 2>&1; then xdg-open "<path>"
-   else echo "Open this in a browser: <path>"; fi
-   ```
-
-5. Reply with exactly this template:
-
-   ```
-   Drill ready: <output path>
-   Topics: <label> (<N> logged mistakes), <label> (<N>), ...
-   Questions: <total count>
+   Drilling your last 7 days: <label> (<N> logged mistakes), <label> (<N>), ...
+   <total count> questions.
    ```
 
 If `history.jsonl` has fewer than 5 usable grammar fixes overall, do not fabricate a generic lesson - say the log is too small and suggest writing more English first.

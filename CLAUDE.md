@@ -10,7 +10,7 @@ Three pieces share one state directory, `$GRAMMAR_HOME` (default `~/.claude/cc-g
 
 - `hooks/grammar-check.sh` - a `UserPromptSubmit` hook that sends each English message to an OpenAI-compatible endpoint, appends mistakes to `history.jsonl`, and writes one status file per session.
 - `statusline/render-grammar.sh` - reads that status file and prints the coloured segment. Sourced by the user's statusline, not executed by the plugin.
-- `skills/drill` and `skills/learn` - read `history.jsonl` and build self-contained HTML lesson pages.
+- `skills/drill`, `skills/learn` and `skills/progress` - read `history.jsonl` and teach from it inside the session. Drill and learn author a quiz as JSON and then run it as a conversation; progress reports trends.
 
 `docs/statusline.md` holds the state-directory table; `docs/mistake-categories.md` the taxonomy; `CONTRIBUTING.md` the wire format.
 
@@ -38,10 +38,17 @@ Render the statusline segment offline against a hand-written status file, with n
 GRAMMAR_HOME=/tmp/gh-test COLUMNS=100 bash -c '. statusline/render-grammar.sh; render_grammar <session-id>'
 ```
 
-Build a drill page from authored JSON (schema and question rules in `skills/drill/references/authoring.md`):
+Validate and store an authored quiz session (schema and question rules in `skills/drill/references/authoring.md`, the session loop in `skills/drill/references/running-a-quiz.md`):
 
 ```
-python3 skills/drill/scripts/build_drill.py <data.json> [out.html]
+python3 skills/drill/scripts/prepare_drill.py <data.json> [out.json]
+```
+
+Record a finished quiz, and print the progress report:
+
+```
+python3 skills/drill/scripts/record_result.py <session.json> <topic-id>=<correct>/<total> ...
+python3 skills/progress/scripts/summarize_progress.py
 ```
 
 Syntax-check the shell scripts - the only static check available here:
@@ -58,7 +65,7 @@ The checker emits plain text lines; the renderer colours them and the drill pars
 
 ### The hook must stay invisible
 
-`UserPromptSubmit` stdout is injected into the conversation as context, so the hook writes nothing to stdout, ever. The model call runs in a backgrounded subshell so the turn is never delayed; feedback lands in the statusline a few seconds later. Gates before the call (empty, slash-command, under 15 or over 500 chars, leading `<`, injected system tags, non-Latin ratio) all `exit 0` silently.
+`UserPromptSubmit` stdout is injected into the conversation as context, so the hook writes nothing to stdout, ever. The model call runs in a backgrounded subshell so the turn is never delayed; feedback lands in the statusline a few seconds later. Gates before the call (a live `drill-active` flag, empty, slash-command, under 15 or over 500 chars, leading `<`, injected system tags, non-Latin ratio) all `exit 0` silently.
 
 ### The checker prompt is assembled per invocation
 
@@ -82,7 +89,15 @@ Claude Code exports `COLUMNS` to the statusline process and keeps it in step wit
 
 ### Skills read state, the hook writes it
 
-`skills/drill` ranks `fixes[].category` over a recency window (7 days, widened to the last 200 lines when thin) rather than lifetime totals, so topics the user stopped getting flagged on stop being drilled. `skills/learn` walks `skills/learn/references/syllabus.md` and enforces one new topic per ISO week through `$GRAMMAR_HOME/curriculum.tsv`. Both author JSON and hand it to the same builder, which validates, inlines the CSS, writes into `$GRAMMAR_HOME/drills/`, prints the path, and never opens a browser - so a rebuild during development does not spawn one.
+`skills/drill` ranks `fixes[].category` over a recency window (7 days, widened to the last 200 lines when thin) rather than lifetime totals, so topics the user stopped getting flagged on stop being drilled. `skills/learn` walks `skills/learn/references/syllabus.md` and enforces one new topic per ISO week through `$GRAMMAR_HOME/curriculum.tsv`. Both author JSON, hand it to `prepare_drill.py` for validation and storage under `$GRAMMAR_HOME/drills/`, and then run the quiz themselves.
+
+### The quiz runs in the session, and that is what buys the grading
+
+There is no page and no server (issue #31, after the dashboard of #26 was built and abandoned in PR #30). The old static page graded a rewrite by string-comparing it against a hand-authored accept-list under a case/whitespace/end-punctuation normalization, so a correct sentence failed over a comma and the authoring rules had to demand every variant be enumerated. Grading in the session is the entire reason the format changed: the model checks the tested construction, so `answers[]` is a reference answer rather than an accept-list, and "wait, why?" gets an answer mid-quiz.
+
+Two consequences the code carries. `hooks/grammar-check.sh` exits early while `$GRAMMAR_HOME/drill-active` exists and is under an hour old, because quiz answers reach the checker as ordinary prompts and would otherwise be logged as the user's own writing and re-ranked into the next drill; the hour is a staleness cap for a session abandoned mid-quiz, and the skills are expected to `rm` the flag themselves. `record_result.py` sums the per-topic scores instead of taking a total, so an abandoned quiz records an honest partial run.
+
+`skills/progress` reads `history.jsonl` and `results.jsonl` and prints tables through `summarize_progress.py`; the skill interprets them and is told not to invent a target, streak or grade.
 
 ### The eval never pools classes
 
