@@ -65,7 +65,7 @@ The checker emits plain text lines; the renderer colours them and the drill pars
 
 ### The hook must stay invisible
 
-`UserPromptSubmit` stdout is injected into the conversation as context, so the hook writes nothing to stdout, ever. The model call runs in a backgrounded subshell so the turn is never delayed; feedback lands in the statusline a few seconds later. Gates before the call (a live `drill-active` flag, empty, slash-command, under 15 or over 500 chars, leading `<`, injected system tags, non-Latin ratio) all `exit 0` silently.
+`UserPromptSubmit` stdout is injected into the conversation as context, so the hook writes nothing to stdout, ever. The model call runs in a backgrounded subshell so the turn is never delayed; feedback lands in the statusline a few seconds later. Gates before the call (a fresh `skip-next-prompt` token, empty, slash-command, under 15 or over 500 chars, leading `<`, injected system tags, non-Latin ratio) all `exit 0` silently.
 
 ### The checker prompt is assembled per invocation
 
@@ -95,7 +95,7 @@ Claude Code exports `COLUMNS` to the statusline process and keeps it in step wit
 
 There is no page and no server (issue #31, after the dashboard of #26 was built and abandoned in PR #30). The old static page graded a rewrite by string-comparing it against a hand-authored accept-list under a case/whitespace/end-punctuation normalization, so a correct sentence failed over a comma and the authoring rules had to demand every variant be enumerated. Grading in the session is the entire reason the format changed: the model checks the tested construction, so `answers[]` is a reference answer rather than an accept-list, and "wait, why?" gets an answer mid-quiz.
 
-Two consequences the code carries. `hooks/grammar-check.sh` exits early while `$GRAMMAR_HOME/drill-active` exists and is under an hour old, because quiz answers reach the checker as ordinary prompts and would otherwise be logged as the user's own writing and re-ranked into the next drill; the hour is a staleness cap for a session abandoned mid-quiz, and the skills are expected to `rm` the flag themselves. `record_result.py` sums the per-topic scores instead of taking a total, so an abandoned quiz records an honest partial run.
+Two consequences the code carries. A written quiz answer reaches the checker as an ordinary prompt and would be logged as the user's own writing, then re-ranked into the next drill, so the skill drops `$GRAMMAR_HOME/skip-next-prompt` in the same message it asks a `rewrite` question and `hooks/grammar-check.sh` consumes it on the next prompt. It is a one-shot token and not a "drill in progress" lease because a drill is not one sitting - a real one ran across thirteen hours interleaved with ordinary work, and a lease covering that would have silenced a day of genuine feedback. `choice` questions need no token at all: an `AskUserQuestion` answer never reaches the hook (issue #11). `record_result.py` sums the per-topic scores instead of taking a total, so a quiz stopped partway records an honest partial run.
 
 `skills/progress` reads `history.jsonl` and `results.jsonl` and prints tables through `summarize_progress.py`; the skill interprets them and is told not to invent a target, streak or grade.
 

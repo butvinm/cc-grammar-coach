@@ -6,15 +6,9 @@ The quiz runs here, in the conversation. There is no page and no browser: you as
 
 ## Before the first question
 
-Silence the checker for the duration:
+Print the lesson for the first topic: the `summary`, and the `examples` as `wrong -> right` pairs with their notes. Keep it to what fits on a screen. Print each later topic's lesson when its first question comes up, not all of them upfront.
 
-```
-touch "$GRAMMAR_HOME/drill-active"
-```
-
-The `UserPromptSubmit` hook exits early while that file exists and is under an hour old. Without it, every rewrite answer is reviewed as if it were the user's own writing and logged to `history.jsonl`, which both pollutes the log and feeds the next drill its own questions.
-
-Then print the lesson for the first topic: the `summary`, and the `examples` as `wrong -> right` pairs with their notes. Keep it to what fits on a screen. Print each later topic's lesson when its first question comes up, not all of them upfront.
+A drill is not one sitting. The user may answer three questions, go back to work, and pick the rest up hours later - that is normal use, not abandonment. Nothing here holds state between questions, so a quiz can be resumed from its session file at any time.
 
 ## The loop
 
@@ -22,8 +16,14 @@ Ask **one question per message** and wait for the answer. Never batch questions,
 
 Prefix each question with its position, `Question 3 of 12`, and name the topic. The user cannot scroll a terminal the way they can scroll a page, so the count is the only progress they get.
 
-- `choice` questions: use `AskUserQuestion` with the authored `options` in their authored order. Do not renumber or reorder them - `answer` is an index into that list.
-- `rewrite` questions: ask in plain chat and read the next user message as the answer.
+- `choice` questions: use `AskUserQuestion` with the authored `options` in their authored order. Do not renumber or reorder them - `answer` is an index into that list. Nothing else is needed: an `AskUserQuestion` answer never reaches the checker hook.
+- `rewrite` questions: the answer arrives as an ordinary message, so the checker would review it as the user's own writing. Drop a one-shot token in the same message you ask the question, and only for a `rewrite`:
+
+  ```
+  touch "$GRAMMAR_HOME/skip-next-prompt"
+  ```
+
+  The hook consumes it on the next prompt and skips exactly that one message. It clears itself, so there is nothing to undo if the user answers something else or never answers at all - at worst one unrelated message goes unchecked, and a token older than 30 minutes is discarded without firing. Never set it ahead of a batch of questions and never leave it set between them: the user writes real English between quiz answers and wants that checked.
 
 ## Grading
 
@@ -48,10 +48,4 @@ When the last question is graded, or when the user stops early, record what was 
 python3 "${CLAUDE_PLUGIN_ROOT}/skills/drill/scripts/record_result.py" <session.json> <topic-id>=<correct>/<total> ...
 ```
 
-Score only the questions that were asked, so an abandoned quiz records an honest partial run rather than a fake perfect one. Then release the checker:
-
-```
-rm -f "$GRAMMAR_HOME/drill-active"
-```
-
-Do this even when the user stops early, and before your closing message - a drill that ends without clearing the flag leaves the checker mute until the hour is up.
+Score only the questions that were asked, so a quiz stopped partway records an honest partial run rather than a fake perfect one. There is nothing else to clean up: the one-shot token is consumed by the hook, not released here.
