@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""Build a grammar drill page from drill data JSON.
+"""Validate authored drill data and store it as a session file.
 
-Usage: build_drill.py <data.json> [output.html]
+Usage: prepare_drill.py <data.json> [output.json]
 
-Validates the drill data, injects it into assets/drill-template.html along with assets/duo.css, writes the page to $GRAMMAR_HOME/drills/drill-<date>-<HHMM>.html (GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach; an explicit output path overrides both), and prints the path. Opening the page is the caller's job, so that building it can be scripted without spawning a browser. Stdlib only.
+The quiz itself runs in the Claude Code session, not in a browser, so this script no longer renders anything: it checks the data the model authored, then writes it to $GRAMMAR_HOME/drills/<kind>-<date>-<HHMM>.json (GRAMMAR_HOME defaults to ~/.claude/cc-grammar-coach; an explicit output path overrides both) and prints the path. The file is what outlives the conversation - the session can be resumed, re-run, or reported on later. Stdlib only.
 """
 
 import json
 import os
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
 
-PLACEHOLDER = "__DRILL_DATA__"
-CSS_PLACEHOLDER = "__DUO_CSS__"
+KINDS = ("drill", "learn")
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def fail(msg: str) -> None:
@@ -22,6 +23,11 @@ def fail(msg: str) -> None:
 
 
 def validate(data: dict) -> None:
+    # 'date' reaches a filename, so it is constrained here rather than trusted: it arrives from an LLM, and a value carrying a slash would write outside drills/.
+    if not DATE_RE.match(str(data.get("date", ""))):
+        fail(f"'date' must be YYYY-MM-DD, got {data.get('date')!r}")
+    if data.get("kind") not in KINDS:
+        fail(f"'kind' must be one of {', '.join(KINDS)}, got {data.get('kind')!r}")
     if not isinstance(data.get("topics"), list) or not data["topics"]:
         fail("'topics' must be a non-empty list")
     if not isinstance(data.get("questions"), list) or not data["questions"]:
@@ -52,33 +58,32 @@ def validate(data: dict) -> None:
             opts = q.get("options")
             if not isinstance(opts, list) or len(opts) < 2:
                 fail(f"choice question needs >= 2 options: {q['prompt']}")
-            if not isinstance(q.get("answer"), int) or not 0 <= q["answer"] < len(opts):
+            # isinstance(True, int) is True in Python, and a bool index would silently grade against option 0 or 1.
+            if isinstance(q.get("answer"), bool) or not isinstance(q.get("answer"), int) or not 0 <= q["answer"] < len(opts):
                 fail(f"choice question needs a valid 'answer' index: {q['prompt']}")
         elif q["type"] == "rewrite":
-            if not isinstance(q.get("answers"), list) or not q["answers"]:
+            answers = q.get("answers")
+            if not isinstance(answers, list) or not answers:
                 fail(f"rewrite question needs a non-empty 'answers' list: {q['prompt']}")
+            if not all(isinstance(a, str) and a.strip() for a in answers):
+                fail(f"rewrite 'answers' must all be non-empty strings: {q['prompt']}")
         else:
             fail(f"unknown question type '{q['type']}': {q['prompt']}")
 
 
 def main() -> None:
     if len(sys.argv) < 2:
-        fail("usage: build_drill.py <data.json> [output.html]")
+        fail("usage: prepare_drill.py <data.json> [output.json]")
     data_path = Path(sys.argv[1])
     try:
         data = json.loads(data_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         fail(f"cannot read drill data: {exc}")
+    if not isinstance(data, dict):
+        fail("drill data must be a JSON object")
     data.setdefault("date", datetime.now().strftime("%Y-%m-%d"))
+    data.setdefault("kind", "drill")
     validate(data)
-
-    assets = Path(__file__).parent.parent / "assets"
-    template = (assets / "drill-template.html").read_text(encoding="utf-8")
-    # duo.css is inlined rather than linked: the page is written to a different directory than the assets and has to stand alone.
-    page = template.replace(CSS_PLACEHOLDER, (assets / "duo.css").read_text(encoding="utf-8"))
-    # Escaping '</' keeps any '</script>' inside drill strings from ending the script tag.
-    payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    page = page.replace(PLACEHOLDER, payload)
 
     if len(sys.argv) > 2:
         out = Path(sys.argv[2])
@@ -86,8 +91,8 @@ def main() -> None:
         home = Path(os.environ.get("GRAMMAR_HOME", Path.home() / ".claude" / "cc-grammar-coach"))
         out_dir = home / "drills"
         out_dir.mkdir(parents=True, exist_ok=True)
-        out = out_dir / f"drill-{data['date']}-{datetime.now().strftime('%H%M')}.html"
-    out.write_text(page, encoding="utf-8")
+        out = out_dir / f"{data['kind']}-{data['date']}-{datetime.now().strftime('%H%M')}.json"
+    out.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(out)
 
 

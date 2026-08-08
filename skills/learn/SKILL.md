@@ -1,11 +1,11 @@
 ---
 name: learn
-description: Teach the next new English grammar topic from a weekly syllabus as a lesson-plus-quiz local web page. Invoke when the user asks to learn a new grammar topic, the next topic, or a fresh grammar lesson beyond their logged mistakes.
+description: Teach the next new English grammar topic from a weekly syllabus as a lesson and quiz in the session. Invoke when the user asks to learn a new grammar topic, the next topic, or a fresh grammar lesson beyond their logged mistakes.
 ---
 
 # Learn
 
-Teach the next new topic from the weekly syllabus as a lesson-plus-quiz web page, personalized with evidence from the grammar-check hook's mistake log.
+Teach the next new topic from the weekly syllabus here in the conversation, as a lesson and a quiz personalized with evidence from the grammar-check hook's mistake log.
 
 The user's native language is `${user_config.native_language}`. When it is set, contrast English rules with the habits that language causes (for example a language with no articles, freer word order, or aspect instead of tense variety). When it is empty, give generic English lessons and do not assume any nationality.
 
@@ -31,27 +31,21 @@ GRAMMAR_HOME="${GRAMMAR_HOME:-$HOME/.claude/cc-grammar-coach}"
 3. Personalize: scan `history.jsonl` for the topic's constructions - `fixes[]` on that category, `message` text using or conspicuously avoiding it, and `praise` lines naming it - to see whether the user misuses, avoids, or already handles the construction, and work that evidence into the lesson.
 
 4. Build the drill data. Read `${CLAUDE_PLUGIN_ROOT}/skills/drill/references/authoring.md` for the data schema and question-writing rules, then author:
-   - The single topic gets `count: 0` (the page renders it as "new topic") and a 3-5 sentence lesson - new material needs more setup than remediation - with 6-8 `questions`.
+   - `kind: "learn"`.
+   - The single topic gets `count: 0` - nothing has been logged against material the user has not been taught yet - and a 3-5 sentence lesson, since new material needs more setup than remediation, with 6-8 `questions`.
    - Lesson `examples` come from the user's logged sentences when the log has usable evidence for the topic. When it does not, invent examples showing the typical error a speaker of the user's native language makes instead - do not present invented sentences as the user's own.
 
-5. Write the data to a JSON file in the scratchpad, then run the builder from the plugin root:
+5. Write the data to a JSON file in the scratchpad, then store the session from the plugin root:
 
    ```
-   python3 "${CLAUDE_PLUGIN_ROOT}/skills/drill/scripts/build_drill.py" <data.json>
+   python3 "${CLAUDE_PLUGIN_ROOT}/skills/drill/scripts/prepare_drill.py" <data.json>
    ```
 
-   The script validates the data, writes `$GRAMMAR_HOME/drills/drill-<date>-<HHMM>.html`, and prints the path without opening it. Open the printed path portably - `open` on macOS, `xdg-open` on Linux, and if neither exists just report the path:
+   The script validates the data, writes `$GRAMMAR_HOME/drills/learn-<date>-<HHMM>.json`, and prints the path.
+
+6. Open with one line naming the topic, picking `New topic` or `Review` to match step 2, then run the quiz. Read `${CLAUDE_PLUGIN_ROOT}/skills/drill/references/running-a-quiz.md` and follow it - it covers the checker flag, the one-question-at-a-time loop, semantic grading, and how to record the result.
 
    ```
-   if command -v open >/dev/null 2>&1; then open "<path>"
-   elif command -v xdg-open >/dev/null 2>&1; then xdg-open "<path>"
-   else echo "Open this in a browser: <path>"; fi
-   ```
-
-6. Reply with exactly this template, picking `New topic` or `Review` to match step 2:
-
-   ```
-   Drill ready: <output path>
    New topic: <label> (<iso-week>)
-   Questions: <total count>
+   <total count> questions.
    ```
