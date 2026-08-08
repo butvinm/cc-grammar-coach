@@ -16,7 +16,7 @@ Ask **one question per message** and wait for the answer. Never batch questions,
 
 Prefix each question with its position, `Question 3 of 12`, and name the topic. The user cannot scroll a terminal the way they can scroll a page, so the count is the only progress they get.
 
-- `choice` questions: use `AskUserQuestion` with the authored `options` in their authored order. Do not renumber or reorder them - `answer` is an index into that list. Nothing else is needed: an `AskUserQuestion` answer never reaches the checker hook.
+- `choice` questions: use `AskUserQuestion` with the authored `options` in their authored order. Do not renumber or reorder them - `answer` is an index into that list. Each option's `label` is the authored sentence verbatim, and its `description` is the empty string - the schema requires the field, so it can be emptied but not dropped. Never summarize an option into the word or morpheme that makes it differ, in either field: that names the decision point before the user has read the sentence, and finding it is the question. Nothing else is needed: an `AskUserQuestion` answer never reaches the checker hook.
 - `rewrite` questions: the answer arrives as an ordinary message, so the checker would review it as the user's own writing. Drop a one-shot token in the same message you ask the question, and only for a `rewrite`:
 
   ```
