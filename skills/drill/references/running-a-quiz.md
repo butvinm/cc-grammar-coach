@@ -38,6 +38,8 @@ Prefix each question with its position, `Question 3 of 12`, and name the topic. 
 
 One line for the verdict, then the question's `explain` text. On a wrong answer, show a reference answer from `answers` (or the correct option) first. When a native language is configured, say in one clause which habit of that language produced the error.
 
+The explanation is the authored `explain`. Anything added on top of it must be about the words in that sentence: a rule generalized at grading time has had neither an authoring pass nor the sanity check of being written down next to the question it explains, and the pull to state one is strongest right after a wrong answer, when a bare correction feels too thin. `authoring.md` covers which topics can carry a general rule and which are memorized per word - the same limits apply here.
+
 If the user asks "why?" or pushes back, answer it properly - that is a feature of this format, not an interruption - then resume at the same question number.
 
 ## Finishing
