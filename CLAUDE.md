@@ -109,4 +109,4 @@ Silence classes (typo, name/mention, natural) are scored as false-positive rates
 - Portable to Linux and macOS: no `grep -P`, no `date -d`, no unconditional `xdg-open`.
 - Comments explain _why_, at the density of the surrounding file; the shell scripts carry long rationale comments and new code there is expected to match.
 - Prose lines are never wrapped at a column - break at a sentence or clause boundary or not at all.
-- `version` in `.claude-plugin/plugin.json` has only ever been bumped on commits that changed the user-facing surface (commands, skills, required configuration); most merged PRs leave it alone.
+- `version` in `.claude-plugin/plugin.json` is bumped on every commit that changes the user-facing surface: commands, required configuration, or a skill. A skill is its `SKILL.md` and every file under `references/` together - those files are what the model executes, not documentation about it, so editing one changes what the user gets and counts the same as changing a shell script. Work with no user-visible effect - repo docs, `eval/`, refactors that preserve behavior - leaves it alone.
