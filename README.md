@@ -3,7 +3,7 @@
 An English grammar coach for Claude Code, in two parts:
 
 - a **checker** hook that reviews every English message you send, out of band, logs the mistakes it finds, and shows short feedback in your statusline;
-- **drill** and **learn** skills that turn that log into personalized lesson-and-quiz web pages: drill practices your logged mistakes, learn teaches the next topic from a weekly syllabus.
+- **drill**, **learn** and **progress** skills that teach from that log without leaving the session: drill practices your logged mistakes, learn teaches the next topic from a weekly syllabus, progress tells you what the log says about your trend.
 
 ## The checker
 
@@ -15,21 +15,21 @@ The checker runs on every message automatically: it reviews the message, appends
 - `<wrong> → <fix> (<rule>: <why>)` - one line per grammar error.
 - `✨ <rephrase>` - a more natural rewrite of the whole message: offered after the error lines when the fixes alone would not make it read natively, or alone - in place of the praise - when the message is grammatically correct but phrased in a way no native would use; the `rephrase` setting turns this line off.
 
-## Drill and learn
+## Drill, learn and progress
 
-Ask in plain language ("give me a grammar drill", "quiz me on my mistakes", "let's learn a new grammar topic"), or invoke the skills explicitly:
+Ask in plain language ("give me a grammar drill", "quiz me on my mistakes", "let's learn a new grammar topic", "am I improving?"), or invoke the skills explicitly:
 
 ```
 /cc-grammar-coach:drill
 /cc-grammar-coach:learn
+/cc-grammar-coach:progress
 ```
 
-**Drill** ranks your recent weak spots from the mistake log and builds a lesson plus quiz per topic, drawn from your own logged mistakes. **Learn** teaches the next new topic from the weekly syllabus, one per week. Either way you get a self-contained HTML page that grades your answers in the browser offline, explaining each answer by contrast with your native language when one is configured.
+**Drill** ranks your recent weak spots from the mistake log and teaches a lesson plus quiz per topic, drawn from your own logged mistakes. **Learn** teaches the next new topic from the weekly syllabus, one per week. **Progress** reads the log back to you: your mistake rate week by week, which categories are moving, and how your quiz scores compare.
 
-<p align="center">
-  <img src="docs/img/quiz-correct.png" width="49%" alt="A choice question answered correctly, with the rule explained">
-  <img src="docs/img/quiz-mistake.png" width="49%" alt="A rewrite question answered wrongly, with the fix explained by contrast with the native language">
-</p>
+The quiz runs in the session, one question at a time - no page, no browser, no port. Answers are graded on the rule rather than matched against a list of accepted strings, so a correct sentence is correct however you phrase it, and you can stop mid-question to ask why. Each authored session is kept as JSON under `~/.claude/cc-grammar-coach/drills/`, and scores land in `results.jsonl`.
+
+While a quiz is running the checker stays quiet: your answers are exercises, not your own writing, and they do not belong in the log.
 
 ## Requirements
 

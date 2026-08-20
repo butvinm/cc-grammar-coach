@@ -10,7 +10,7 @@ Three pieces share one state directory, `$GRAMMAR_HOME` (default `~/.claude/cc-g
 
 - `hooks/grammar-check.sh` - a `UserPromptSubmit` hook that sends each English message to an OpenAI-compatible endpoint, appends mistakes to `history.jsonl`, and writes one status file per session.
 - `statusline/render-grammar.sh` - reads that status file and prints the coloured segment. Sourced by the user's statusline, not executed by the plugin.
-- `skills/drill` and `skills/learn` - read `history.jsonl` and build self-contained HTML lesson pages.
+- `skills/drill`, `skills/learn` and `skills/progress` - read `history.jsonl` and teach from it inside the session. Drill and learn author a quiz as JSON and then run it as a conversation; progress reports trends.
 
 `docs/statusline.md` holds the state-directory table; `docs/mistake-categories.md` the taxonomy; `CONTRIBUTING.md` the wire format.
 
@@ -38,10 +38,17 @@ Render the statusline segment offline against a hand-written status file, with n
 GRAMMAR_HOME=/tmp/gh-test COLUMNS=100 bash -c '. statusline/render-grammar.sh; render_grammar <session-id>'
 ```
 
-Build a drill page from authored JSON (schema and question rules in `skills/drill/references/authoring.md`):
+Validate and store an authored quiz session (schema and question rules in `skills/drill/references/authoring.md`, the session loop in `skills/drill/references/running-a-quiz.md`):
 
 ```
-python3 skills/drill/scripts/build_drill.py <data.json> [out.html]
+python3 skills/drill/scripts/prepare_drill.py <data.json> [out.json]
+```
+
+Record a finished quiz, and print the progress report:
+
+```
+python3 skills/drill/scripts/record_result.py <session.json> <topic-id>=<correct>/<total> ...
+python3 skills/progress/scripts/summarize_progress.py
 ```
 
 Syntax-check the shell scripts - the only static check available here:
@@ -58,7 +65,7 @@ The checker emits plain text lines; the renderer colours them and the drill pars
 
 ### The hook must stay invisible
 
-`UserPromptSubmit` stdout is injected into the conversation as context, so the hook writes nothing to stdout, ever. The model call runs in a backgrounded subshell so the turn is never delayed; feedback lands in the statusline a few seconds later. Gates before the call (empty, slash-command, under 15 or over 500 chars, leading `<`, injected system tags, non-Latin ratio) all `exit 0` silently.
+`UserPromptSubmit` stdout is injected into the conversation as context, so the hook writes nothing to stdout, ever. The model call runs in a backgrounded subshell so the turn is never delayed; feedback lands in the statusline a few seconds later. Gates before the call (a fresh `skip-next-prompt` token, empty, slash-command, under 15 or over 500 chars, leading `<`, injected system tags, non-Latin ratio) all `exit 0` silently.
 
 ### The checker prompt is assembled per invocation
 
@@ -82,7 +89,15 @@ Claude Code exports `COLUMNS` to the statusline process and keeps it in step wit
 
 ### Skills read state, the hook writes it
 
-`skills/drill` ranks `fixes[].category` over a recency window (7 days, widened to the last 200 lines when thin) rather than lifetime totals, so topics the user stopped getting flagged on stop being drilled. `skills/learn` walks `skills/learn/references/syllabus.md` and enforces one new topic per ISO week through `$GRAMMAR_HOME/curriculum.tsv`. Both author JSON and hand it to the same builder, which validates, inlines the CSS, writes into `$GRAMMAR_HOME/drills/`, prints the path, and never opens a browser - so a rebuild during development does not spawn one.
+`skills/drill` ranks `fixes[].category` over a recency window (7 days, widened to the last 200 lines when thin) rather than lifetime totals, so topics the user stopped getting flagged on stop being drilled. `skills/learn` walks `skills/learn/references/syllabus.md` and enforces one new topic per ISO week through `$GRAMMAR_HOME/curriculum.tsv`. Both author JSON, hand it to `prepare_drill.py` for validation and storage under `$GRAMMAR_HOME/drills/`, and then run the quiz themselves.
+
+### The quiz runs in the session, and that is what buys the grading
+
+There is no page and no server (issue #31, after the dashboard of #26 was built and abandoned in PR #30). The old static page graded a rewrite by string-comparing it against a hand-authored accept-list under a case/whitespace/end-punctuation normalization, so a correct sentence failed over a comma and the authoring rules had to demand every variant be enumerated. Grading in the session is the entire reason the format changed: the model checks the tested construction, so `answers[]` is a reference answer rather than an accept-list, and "wait, why?" gets an answer mid-quiz.
+
+Two consequences the code carries. A written quiz answer reaches the checker as an ordinary prompt and would be logged as the user's own writing, then re-ranked into the next drill, so the skill drops `$GRAMMAR_HOME/skip-next-prompt` in the same message it asks a `rewrite` question and `hooks/grammar-check.sh` consumes it on the next prompt. It is a one-shot token and not a "drill in progress" lease because a drill is not one sitting - a real one ran across thirteen hours interleaved with ordinary work, and a lease covering that would have silenced a day of genuine feedback. `choice` questions need no token at all: an `AskUserQuestion` answer never reaches the hook (issue #11). `record_result.py` sums the per-topic scores instead of taking a total, so a quiz stopped partway records an honest partial run.
+
+`skills/progress` reads `history.jsonl` and `results.jsonl` and prints tables through `summarize_progress.py`; the skill interprets them and is told not to invent a target, streak or grade.
 
 ### The eval never pools classes
 
@@ -94,4 +109,4 @@ Silence classes (typo, name/mention, natural) are scored as false-positive rates
 - Portable to Linux and macOS: no `grep -P`, no `date -d`, no unconditional `xdg-open`.
 - Comments explain _why_, at the density of the surrounding file; the shell scripts carry long rationale comments and new code there is expected to match.
 - Prose lines are never wrapped at a column - break at a sentence or clause boundary or not at all.
-- `version` in `.claude-plugin/plugin.json` has only ever been bumped on commits that changed the user-facing surface (commands, skills, required configuration); most merged PRs leave it alone.
+- `version` in `.claude-plugin/plugin.json` is bumped on every commit that changes the user-facing surface: commands, required configuration, or a skill. A skill is its `SKILL.md` and every file under `references/` together - those files are what the model executes, not documentation about it, so editing one changes what the user gets and counts the same as changing a shell script. Work with no user-visible effect - repo docs, `eval/`, refactors that preserve behavior - leaves it alone.

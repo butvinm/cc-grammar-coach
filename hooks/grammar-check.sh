@@ -47,6 +47,15 @@ STATUS_FILE="$STATUS_DIR/$SID"
 : > "$STATUS_FILE"
 find "$STATUS_DIR" -type f -mtime +1 -delete 2>/dev/null
 
+# One-shot suppression, written by the drill and learn skills before they ask a written quiz answer. Such an answer is an exercise aimed at a rule the user is being taught, not their own writing, and logging it would both distort history.jsonl and feed the drill its own output - skills/drill ranks topics over the same fixes[] it would be writing.
+# A token rather than a "drill in progress" lease, because a drill is not one sitting: a real one ran across thirteen hours interleaved with ordinary work, and a lease long enough to cover that would silence a day of genuine feedback. This skips exactly the next message and is consumed whether or not it fires, so nothing has to remember to clean it up. The freshness check only bounds the surprise when a question is never answered: the token still dies here, but a forgotten one does not swallow an unrelated message hours later.
+SKIP_FLAG="$GRAMMAR_HOME/skip-next-prompt"
+if [ -e "$SKIP_FLAG" ]; then
+  SKIP_FRESH=$(find "$SKIP_FLAG" -mmin -30 2>/dev/null)
+  rm -f "$SKIP_FLAG"
+  [ -n "$SKIP_FRESH" ] && exit 0
+fi
+
 [ -z "$PROMPT" ] && exit 0
 case "$PROMPT" in /*) exit 0 ;; esac
 [ "${#PROMPT}" -lt "$MIN_CHARS" ] && exit 0
