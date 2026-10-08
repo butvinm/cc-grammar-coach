@@ -2,7 +2,7 @@
 
 An English grammar coach for Claude Code, in two parts:
 
-- a **checker** hook that reviews every English message you send, out of band, logs the mistakes it finds, and shows short feedback in your statusline;
+- a **checker** hook that reviews every English message you send, out of band, logs the mistakes it finds, and shows short feedback in your statusline, plus a command that tells you whether your last message sounds natural;
 - **drill**, **learn** and **progress** skills that teach from that log without leaving the session: drill practices your logged mistakes, learn teaches the next topic from a weekly syllabus, progress tells you what the log says about your trend.
 
 ## The checker
@@ -14,6 +14,27 @@ The checker runs on every message automatically: it reviews the message, appends
 - `✔ "not because of" - a clean contrast.` - clean message, one compliment about this message: it names the construction you got right, so the praise doubles as reinforcement rather than a stock verdict.
 - `<wrong> → <fix> (<rule>: <why>)` - one line per grammar error.
 - `✨ <rephrase>` - a more natural rewrite of the whole message: offered after the error lines when the fixes alone would not make it read natively, or alone - in place of the praise - when the message is grammatically correct but phrased in a way no native would use; the `rephrase` setting turns this line off.
+
+## Does it sound natural?
+
+The checker stays silent on anything that is only a matter of naturalness. To ask about it, run the command after your message, or pass it any text, such as a draft you have not sent yet:
+
+```
+/cc-grammar-coach:natural
+/cc-grammar-coach:natural <text to check>
+```
+
+It answers with either a short confirmation or the fragments that sound off, plus how a native would write the whole message:
+
+```
+"why is "Рефал-05" a link but "Рефал-5-фреймворк" is not?"
+
+Not quite natural:
+- "is not" - in chat a native would contract it to "isn't"
+✨ Why is "Рефал-05" a link but "Рефал-5-фреймворк" isn't?
+```
+
+The answer is shown only to you. Neither the command nor the verdict reaches Claude, so asking costs the session no context, and the statusline keeps the checker's feedback on your message. The answer takes a few seconds, because it comes from the same model the checker uses.
 
 ## Drill, learn and progress
 
