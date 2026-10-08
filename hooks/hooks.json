@@ -3,7 +3,16 @@
     "UserPromptSubmit": [
       {
         "hooks": [
-          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/grammar-check.sh", "timeout": 10 }
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/grammar-check.sh", "timeout": 10 },
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/naturalness-check.sh", "timeout": 10 }
+        ]
+      }
+    ],
+    "UserPromptExpansion": [
+      {
+        "matcher": "cc-grammar-coach:natural",
+        "hooks": [
+          { "type": "command", "command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/naturalness-check.sh", "timeout": 60, "statusMessage": "Checking whether it sounds natural..." }
         ]
       }
     ]

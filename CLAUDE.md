@@ -6,9 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Claude Code plugin (`.claude-plugin/plugin.json`), installed from this repo as a marketplace. Nothing is compiled, bundled, or packaged: the repo tree _is_ the artifact, and Claude Code copies it into a versioned plugin cache on install. Runtime is bash + python3 stdlib + curl, no dependencies to install and no virtualenv.
 
-Three pieces share one state directory, `$GRAMMAR_HOME` (default `~/.claude/cc-grammar-coach`):
+Four pieces share one state directory, `$GRAMMAR_HOME` (default `~/.claude/cc-grammar-coach`):
 
 - `hooks/grammar-check.sh` - a `UserPromptSubmit` hook that sends each English message to an OpenAI-compatible endpoint, appends mistakes to `history.jsonl`, and writes one status file per session.
+- `hooks/naturalness-check.sh` with `commands/natural.md` - a second `UserPromptSubmit` hook that remembers each message in `last-prompt/<session-id>`, and a `UserPromptExpansion` hook on `/cc-grammar-coach:natural` that judges that message, or the command's argument, with `prompts/naturalness.txt` and shows the verdict by blocking the command.
 - `statusline/render-grammar.sh` - reads that status file and prints the coloured segment. Sourced by the user's statusline, not executed by the plugin.
 - `skills/drill`, `skills/learn` and `skills/progress` - read `history.jsonl` and teach from it inside the session. Drill and learn author a quiz as JSON and then run it as a conversation; progress reports trends.
 
@@ -32,6 +33,15 @@ Run the hook once, in isolation, without touching real state - `GRAMMAR_HOOK_SYN
 printf '{"session_id":"t1","prompt":"we was agree about it"}' | GRAMMAR_HOME=/tmp/gh-test GRAMMAR_HOOK_SYNC=1 CLAUDE_PLUGIN_ROOT=$PWD bash hooks/grammar-check.sh
 ```
 
+The naturalness hook calls the model synchronously, so it needs no `GRAMMAR_HOOK_SYNC`. Send a message, then expand the command; the second call prints the block decision whose `reason` is the verdict:
+
+```
+printf '{"hook_event_name":"UserPromptSubmit","session_id":"t1","prompt":"it has sense to merge it now"}' | GRAMMAR_HOME=/tmp/gh-test CLAUDE_PLUGIN_ROOT=$PWD bash hooks/naturalness-check.sh
+printf '{"hook_event_name":"UserPromptExpansion","session_id":"t1","command_name":"cc-grammar-coach:natural","command_args":""}' | GRAMMAR_HOME=/tmp/gh-test CLAUDE_PLUGIN_ROOT=$PWD bash hooks/naturalness-check.sh
+```
+
+A plugin loaded with `claude --plugin-dir` gets none of the `CLAUDE_PLUGIN_OPTION_*` values the installed one has, so a live session against a checkout reaches the hooks but not the model; export the three option variables yourself to test the model call that way.
+
 Render the statusline segment offline against a hand-written status file, with no session and no model:
 
 ```
@@ -54,7 +64,7 @@ python3 skills/progress/scripts/summarize_progress.py
 Syntax-check the shell scripts - the only static check available here:
 
 ```
-bash -n hooks/grammar-check.sh statusline/render-grammar.sh statusline/grammar-statusline.sh
+bash -n hooks/grammar-check.sh hooks/naturalness-check.sh statusline/render-grammar.sh statusline/grammar-statusline.sh
 ```
 
 ## Architecture
@@ -66,6 +76,16 @@ The checker emits plain text lines; the renderer colours them and the drill pars
 ### The hook must stay invisible
 
 `UserPromptSubmit` stdout is injected into the conversation as context, so the hook writes nothing to stdout, ever. The model call runs in a backgrounded subshell so the turn is never delayed; feedback lands in the statusline a few seconds later. Gates before the call (a fresh `skip-next-prompt` token, empty, slash-command, under 15 or over 500 chars, leading `<`, injected system tags, non-Latin ratio) all `exit 0` silently.
+
+### The naturalness command answers by blocking its own expansion
+
+`/cc-grammar-coach:natural` is answered by `hooks/naturalness-check.sh` on `UserPromptExpansion`, the one place a hook here writes to stdout. It returns `{"decision": "block", "reason": ...}`: a blocked command never expands and never reaches the model, and the reason is shown to the user without being added to context, so neither the command nor the verdict costs the session anything. That is the whole point of the design, because an ordinary command or skill, `context: fork` included, always returns its output into the conversation. It was verified against live Claude Code sessions, not only taken from the docs: a later turn saw neither the command, its body, nor the verdict, and the transcript stores the block as a `system` `informational` entry that is not replayed to the model. `suppressOriginalPrompt` keeps the block message from ending with the typed command.
+
+Consequences the files carry. The `matcher` on the `UserPromptExpansion` entry limits the hook to this one command, so its `statusMessage` does not flash on every other slash command. The body of `commands/natural.md` is only a fallback that the model sees when the hook failed or timed out, so it tells the model to report that and do nothing else, and `disable-model-invocation: true` keeps Claude from running the command through a path this hook does not cover. The command costs one line in the command listing the model sees at session start, like every plugin command.
+
+`UserPromptSubmit` does not fire for a command whose expansion was blocked, and for any other command it receives the raw `/...` text, so the remember side never overwrites the saved message with a command; its `/` gate covers that. The previous message comes from the hook's own `last-prompt/<session-id>` rather than from `transcript_path`, because the transcript format is internal to Claude Code and may lag the in-memory conversation.
+
+Unlike the checker, this model call is synchronous, because the verdict is the block reason: `curl --max-time 45` keeps it inside the `timeout` of 60 on that entry in `hooks/hooks.json`. `prompts/naturalness.txt` is a separate prompt on purpose: `prompts/checker.txt` must stay silent on naturalness, which is exactly what the user asks about here.
 
 ### The checker prompt is assembled per invocation
 
